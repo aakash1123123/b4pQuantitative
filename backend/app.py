@@ -36,6 +36,7 @@ def calculate_kpis():
     """Return basic KPI metrics; placeholder implementation."""
     total = len(items_db)
     #we need to work on this function 
+    #whats up ritvik!
     expiring = sum(1 for i in items_db if i.expiration_date)
     avg_duration = 0.0
     if items_db:
