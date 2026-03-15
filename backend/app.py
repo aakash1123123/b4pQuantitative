@@ -43,6 +43,8 @@ class KPIResponse(BaseModel):
     duration_ranges_category_breakdown: Dict[str, Dict]
     category_kpis: Dict[str, Dict]
     top_supplies_table: Dict[str, Dict]
+    weekly_productivity_kpis: Dict[str, Dict]
+    pallet_kpis: Dict[str, Dict]
 
 
 # In-memory placeholder storage
@@ -408,9 +410,201 @@ def calculate_kpis():
 
     #------------------------------------------------------------
     
-    # Pallet level KPIS
+    # PALLET LEVEL KPIS
+    pallet_kpis = {}
+    unique_pallets = set(i.pallet_number for i in items_db)
+    
+    for pallet_num in sorted(unique_pallets):
+        pallet_items = [i for i in items_db if i.pallet_number == pallet_num]
+        
+        pallet_entries = len(pallet_items)
+        pallet_quantity = sum(i.quantity for i in pallet_items)
+        pallet_value = sum(i.total_value for i in pallet_items)
+        pallet_avg_price_per_item = pallet_value / pallet_quantity if pallet_quantity > 0 else 0
+        
+        # Category distribution
+        pallet_category_dist = {}
+        for item in pallet_items:
+            if item.category not in pallet_category_dist:
+                pallet_category_dist[item.category] = 0
+            pallet_category_dist[item.category] += 1
+        
+        # Top 20 items per pallet by quantity
+        pallet_supply_metrics = {}
+        for item in pallet_items:
+            if item.gen_name not in pallet_supply_metrics:
+                pallet_supply_metrics[item.gen_name] = {
+                    "total_entries": 0,
+                    "total_raw_items": 0,
+                    "total_value": 0
+                }
+            pallet_supply_metrics[item.gen_name]["total_entries"] += 1
+            pallet_supply_metrics[item.gen_name]["total_raw_items"] += item.quantity
+            pallet_supply_metrics[item.gen_name]["total_value"] += item.total_value
+        
+        for supply_name in pallet_supply_metrics:
+            total_entries = pallet_supply_metrics[supply_name]["total_entries"]
+            total_value = pallet_supply_metrics[supply_name]["total_value"]
+            pallet_supply_metrics[supply_name]["avg_value_per_item"] = round(total_value / total_entries, 2) if total_entries > 0 else 0
+            pallet_supply_metrics[supply_name]["total_value"] = round(total_value, 2)
+        
+        top_pallet_supplies = sorted(pallet_supply_metrics.items(), key=lambda x: x[1]["total_raw_items"], reverse=True)[:20]
+        top_pallet_supplies_table = {supply_name: metrics for supply_name, metrics in top_pallet_supplies}
+        
+        # Expiry ranges for pallet
+        pallet_expires_already = sum(1 for i in pallet_items if i.expiration_date and datetime.fromisoformat(i.expiration_date) <= today)
+        pallet_expires_already_value = sum(i.total_value for i in pallet_items if i.expiration_date and datetime.fromisoformat(i.expiration_date) <= today)
+        pallet_expires_already_qty = sum(i.quantity for i in pallet_items if i.expiration_date and datetime.fromisoformat(i.expiration_date) <= today)
+        
+        pallet_expires_0_90 = sum(1 for i in pallet_items if i.expiration_date and today < datetime.fromisoformat(i.expiration_date) <= today + timedelta(days=90))
+        pallet_expires_0_90_value = sum(i.total_value for i in pallet_items if i.expiration_date and today < datetime.fromisoformat(i.expiration_date) <= today + timedelta(days=90))
+        pallet_expires_0_90_qty = sum(i.quantity for i in pallet_items if i.expiration_date and today < datetime.fromisoformat(i.expiration_date) <= today + timedelta(days=90))
+        
+        pallet_expires_90_180 = sum(1 for i in pallet_items if i.expiration_date and today + timedelta(days=90) < datetime.fromisoformat(i.expiration_date) <= today + timedelta(days=180))
+        pallet_expires_90_180_value = sum(i.total_value for i in pallet_items if i.expiration_date and today + timedelta(days=90) < datetime.fromisoformat(i.expiration_date) <= today + timedelta(days=180))
+        pallet_expires_90_180_qty = sum(i.quantity for i in pallet_items if i.expiration_date and today + timedelta(days=90) < datetime.fromisoformat(i.expiration_date) <= today + timedelta(days=180))
+        
+        pallet_expires_180_365 = sum(1 for i in pallet_items if i.expiration_date and today + timedelta(days=180) < datetime.fromisoformat(i.expiration_date) <= today + timedelta(days=365))
+        pallet_expires_180_365_value = sum(i.total_value for i in pallet_items if i.expiration_date and today + timedelta(days=180) < datetime.fromisoformat(i.expiration_date) <= today + timedelta(days=365))
+        pallet_expires_180_365_qty = sum(i.quantity for i in pallet_items if i.expiration_date and today + timedelta(days=180) < datetime.fromisoformat(i.expiration_date) <= today + timedelta(days=365))
+        
+        pallet_expires_365_plus = sum(1 for i in pallet_items if i.expiration_date and datetime.fromisoformat(i.expiration_date) > today + timedelta(days=365))
+        pallet_expires_365_plus_value = sum(i.total_value for i in pallet_items if i.expiration_date and datetime.fromisoformat(i.expiration_date) > today + timedelta(days=365))
+        pallet_expires_365_plus_qty = sum(i.quantity for i in pallet_items if i.expiration_date and datetime.fromisoformat(i.expiration_date) > today + timedelta(days=365))
+        
+        pallet_no_expiration = sum(1 for i in pallet_items if not i.expiration_date)
+        pallet_no_expiration_value = sum(i.total_value for i in pallet_items if not i.expiration_date)
+        pallet_no_expiration_qty = sum(i.quantity for i in pallet_items if not i.expiration_date)
+        
+        pallet_expiry_ranges = {}
+        if pallet_quantity > 0:
+            pallet_expiry_ranges["Already Expired"] = {"entries": pallet_expires_already, "raw_items": pallet_expires_already_qty, "value": round(pallet_expires_already_value, 2), "percentage": round((pallet_expires_already_qty / pallet_quantity) * 100, 2)}
+            pallet_expiry_ranges["0-90 days"] = {"entries": pallet_expires_0_90, "raw_items": pallet_expires_0_90_qty, "value": round(pallet_expires_0_90_value, 2), "percentage": round((pallet_expires_0_90_qty / pallet_quantity) * 100, 2)}
+            pallet_expiry_ranges["90-180 days"] = {"entries": pallet_expires_90_180, "raw_items": pallet_expires_90_180_qty, "value": round(pallet_expires_90_180_value, 2), "percentage": round((pallet_expires_90_180_qty / pallet_quantity) * 100, 2)}
+            pallet_expiry_ranges["180-365 days"] = {"entries": pallet_expires_180_365, "raw_items": pallet_expires_180_365_qty, "value": round(pallet_expires_180_365_value, 2), "percentage": round((pallet_expires_180_365_qty / pallet_quantity) * 100, 2)}
+            pallet_expiry_ranges["365+ days"] = {"entries": pallet_expires_365_plus, "raw_items": pallet_expires_365_plus_qty, "value": round(pallet_expires_365_plus_value, 2), "percentage": round((pallet_expires_365_plus_qty / pallet_quantity) * 100, 2)}
+            pallet_expiry_ranges["No expiration date"] = {"entries": pallet_no_expiration, "raw_items": pallet_no_expiration_qty, "value": round(pallet_no_expiration_value, 2), "percentage": round((pallet_no_expiration_qty / pallet_quantity) * 100, 2)}
+        
+        # Duration ranges for pallet
+        pallet_duration_0_30 = sum(1 for i in pallet_items if i.warehouse_date and (today - datetime.fromisoformat(i.warehouse_date)).days <= 30)
+        pallet_duration_0_30_value = sum(i.total_value for i in pallet_items if i.warehouse_date and (today - datetime.fromisoformat(i.warehouse_date)).days <= 30)
+        pallet_duration_0_30_qty = sum(i.quantity for i in pallet_items if i.warehouse_date and (today - datetime.fromisoformat(i.warehouse_date)).days <= 30)
+        
+        pallet_duration_30_90 = sum(1 for i in pallet_items if i.warehouse_date and 30 < (today - datetime.fromisoformat(i.warehouse_date)).days <= 90)
+        pallet_duration_30_90_value = sum(i.total_value for i in pallet_items if i.warehouse_date and 30 < (today - datetime.fromisoformat(i.warehouse_date)).days <= 90)
+        pallet_duration_30_90_qty = sum(i.quantity for i in pallet_items if i.warehouse_date and 30 < (today - datetime.fromisoformat(i.warehouse_date)).days <= 90)
+        
+        pallet_duration_90_180 = sum(1 for i in pallet_items if i.warehouse_date and 90 < (today - datetime.fromisoformat(i.warehouse_date)).days <= 180)
+        pallet_duration_90_180_value = sum(i.total_value for i in pallet_items if i.warehouse_date and 90 < (today - datetime.fromisoformat(i.warehouse_date)).days <= 180)
+        pallet_duration_90_180_qty = sum(i.quantity for i in pallet_items if i.warehouse_date and 90 < (today - datetime.fromisoformat(i.warehouse_date)).days <= 180)
+        
+        pallet_duration_180_plus = sum(1 for i in pallet_items if i.warehouse_date and (today - datetime.fromisoformat(i.warehouse_date)).days > 180)
+        pallet_duration_180_plus_value = sum(i.total_value for i in pallet_items if i.warehouse_date and (today - datetime.fromisoformat(i.warehouse_date)).days > 180)
+        pallet_duration_180_plus_qty = sum(i.quantity for i in pallet_items if i.warehouse_date and (today - datetime.fromisoformat(i.warehouse_date)).days > 180)
+        
+        pallet_duration_ranges = {}
+        if pallet_quantity > 0:
+            pallet_duration_ranges["0-30 days"] = {"entries": pallet_duration_0_30, "raw_items": pallet_duration_0_30_qty, "value": round(pallet_duration_0_30_value, 2), "percentage": round((pallet_duration_0_30_qty / pallet_quantity) * 100, 2)}
+            pallet_duration_ranges["30-90 days"] = {"entries": pallet_duration_30_90, "raw_items": pallet_duration_30_90_qty, "value": round(pallet_duration_30_90_value, 2), "percentage": round((pallet_duration_30_90_qty / pallet_quantity) * 100, 2)}
+            pallet_duration_ranges["90-180 days"] = {"entries": pallet_duration_90_180, "raw_items": pallet_duration_90_180_qty, "value": round(pallet_duration_90_180_value, 2), "percentage": round((pallet_duration_90_180_qty / pallet_quantity) * 100, 2)}
+            pallet_duration_ranges["180+ days"] = {"entries": pallet_duration_180_plus, "raw_items": pallet_duration_180_plus_qty, "value": round(pallet_duration_180_plus_value, 2), "percentage": round((pallet_duration_180_plus_qty / pallet_quantity) * 100, 2)}
+        
+        # Category box distribution
+        pallet_category_box_dist = {}
+        for item in pallet_items:
+            if item.category_box not in pallet_category_box_dist:
+                pallet_category_box_dist[item.category_box] = 0
+            pallet_category_box_dist[item.category_box] += 1
+        
+        pallet_kpis[pallet_num] = {
+            "total_entries": pallet_entries,
+            "total_raw_items": pallet_quantity,
+            "total_value": round(pallet_value, 2),
+            "avg_price_per_raw_item": round(pallet_avg_price_per_item, 2),
+            "category_distribution": pallet_category_dist,
+            "category_box_distribution": pallet_category_box_dist,
+            "top_20_items": top_pallet_supplies_table,
+            "expiry_ranges_table": pallet_expiry_ranges,
+            "duration_ranges_table": pallet_duration_ranges
+        }
 
-    # Shipment KPIS
+    #INVENTORYING EVENT KPIS - WEEKLY PRODUCTIVITY
+    
+    # Calculate weekly inventory productivity KPIs
+    weekly_productivity_kpis = {}
+    
+    # Get all unique weeks from items in the database
+    items_with_dates = [i for i in items_db if i.warehouse_date]
+    if items_with_dates:
+        # Determine the range of weeks
+        weeks_with_items = set()
+        for item in items_with_dates:
+            item_date = datetime.fromisoformat(item.warehouse_date).date()
+            # Get Monday of the week (Monday = 0 in weekday())
+            monday = item_date - timedelta(days=item_date.weekday())
+            sunday = monday + timedelta(days=6)
+            weeks_with_items.add((monday, sunday))
+        
+        # For each week, calculate productivity KPIs
+        for monday, sunday in sorted(weeks_with_items):
+            week_key = f"{monday.strftime('%Y-%m-%d')} to {sunday.strftime('%Y-%m-%d')}"
+            week_start = datetime.combine(monday, datetime.min.time())
+            week_end = datetime.combine(sunday, datetime.max.time())
+            
+            # Get items added in this week
+            week_items = [i for i in items_db if week_start <= datetime.fromisoformat(i.warehouse_date) <= week_end]
+            
+            if week_items:
+                week_entries = len(week_items)
+                week_quantity = sum(i.quantity for i in week_items)
+                week_value = sum(i.total_value for i in week_items)
+                
+                # Category breakdown
+                category_breakdown = {}
+                for item in week_items:
+                    if item.category not in category_breakdown:
+                        category_breakdown[item.category] = 0
+                    category_breakdown[item.category] += 1
+                
+                # Category boxes added breakdown
+                category_box_breakdown = {}
+                for item in week_items:
+                    if item.category_box not in category_box_breakdown:
+                        category_box_breakdown[item.category_box] = 0
+                    category_box_breakdown[item.category_box] += 1
+                
+                # Pallets accessed with detailed breakdown
+                pallets_detail = {}
+                unique_pallets = set(i.pallet_number for i in week_items)
+                for pallet_num in sorted(unique_pallets):
+                    pallet_items = [i for i in week_items if i.pallet_number == pallet_num]
+                    pallet_boxes = set((i.category_box, i.box_number) for i in pallet_items)
+                    
+                    # Category boxes breakdown for this pallet
+                    pallet_category_boxes = {}
+                    for item in pallet_items:
+                        if item.category_box not in pallet_category_boxes:
+                            pallet_category_boxes[item.category_box] = 0
+                        pallet_category_boxes[item.category_box] += 1
+                    
+                    pallets_detail[pallet_num] = {
+                        "total_boxes_added": len(pallet_boxes),
+                        "category_boxes": pallet_category_boxes
+                    }
+                
+                weekly_productivity_kpis[week_key] = {
+                    "total_entries": week_entries,
+                    "total_raw_items": week_quantity,
+                    "total_value": round(week_value, 2),
+                    "total_pallets_accessed": len(unique_pallets),
+                    "pallets_accessed": pallets_detail,
+                    "total_category_boxes_added": sum(category_box_breakdown.values()),
+                    "category_boxes_added": category_box_breakdown
+                }
+
+    #------------------------------------------------
+
+    # SHIPMENT KPIS
 
 
 
@@ -431,6 +625,8 @@ def calculate_kpis():
                        expiry_ranges_category_breakdown=expiry_ranges_category_breakdown,
                        duration_ranges_category_breakdown=duration_ranges_category_breakdown,
                        category_kpis=category_kpis,
-                       top_supplies_table=top_supplies_table)
+                       top_supplies_table=top_supplies_table,
+                       weekly_productivity_kpis=weekly_productivity_kpis,
+                       pallet_kpis=pallet_kpis)
 
 # TODO: Add Google Sheets integration functions in sheets_client.py
