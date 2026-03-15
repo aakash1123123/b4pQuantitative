@@ -409,7 +409,6 @@ def calculate_kpis():
     #------------------------------------------------------------
     
     # Pallet level KPIS
-    print("hello world")
 
     # Shipment KPIS
 
