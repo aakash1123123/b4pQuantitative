@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List, Dict, Any
 from datetime import datetime, timedelta
 
 app = FastAPI(title="Inventory Backend API")
