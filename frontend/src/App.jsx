@@ -13,12 +13,16 @@ const tabs = [
 const defaultShipments = [
   {
     id: "shipment-1",
-    name: "Shipment A",
+    recipientName: "Shipment A",
+    shipmentType: "Local",
+    pointOfContact: "",
     items: [],
   },
   {
     id: "shipment-2",
-    name: "Shipment B",
+    recipientName: "Shipment B",
+    shipmentType: "Local",
+    pointOfContact: "",
     items: [],
   },
 ];
@@ -198,14 +202,19 @@ export default function App() {
   const [selectedExpiration, setSelectedExpiration] = useState([]);
   const [selectedDuration, setSelectedDuration] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const [selectedStatuses, setSelectedStatuses] = useState([]);
+  const [showAvailableItems, setShowAvailableItems] = useState(false);
   const [shipments, setShipments] = useState(defaultShipments);
   const [isShipmentModalOpen, setIsShipmentModalOpen] = useState(false);
   const [pendingShipmentItems, setPendingShipmentItems] = useState([]);
   const [selectedShipmentId, setSelectedShipmentId] = useState("shipment-1");
-  const [newShipmentName, setNewShipmentName] = useState("");
+  const [newShipmentRecipientName, setNewShipmentRecipientName] = useState("");
+  const [newShipmentType, setNewShipmentType] = useState("Local");
+  const [newShipmentPointOfContact, setNewShipmentPointOfContact] = useState("");
+  const [newShipmentSupplyIds, setNewShipmentSupplyIds] = useState("");
   const [selectedInventoryIds, setSelectedInventoryIds] = useState([]);
-  const [valuationLimit, setValuationLimit] = useState(0);
+  const [valuationRange, setValuationRange] = useState({ min: 0, max: 0 });
+  const [shipmentSearchTerm, setShipmentSearchTerm] = useState("");
+  const [isCreateShipmentModalOpen, setIsCreateShipmentModalOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -296,17 +305,10 @@ export default function App() {
     "Unknown duration",
   ]);
   const categoryOptions = buildFacetCounts(inventoryRowsWithStatus, "category");
-  const statusOptions = buildFacetCounts(inventoryRowsWithStatus, "inventoryStatus", [
-    "Inventory",
-    "Pulled",
-    "Consolidated",
-    "Shipped",
-    "Delivered",
-  ]);
 
   useEffect(() => {
-    setValuationLimit(maxValuation);
-  }, [maxValuation]);
+    setValuationRange({ min: minValuation, max: maxValuation });
+  }, [minValuation, maxValuation]);
 
   function matchesSelectedFilter(selectedValues, rowValue) {
     return selectedValues.length === 0 || selectedValues.includes(rowValue);
@@ -327,14 +329,60 @@ export default function App() {
 
     setPendingShipmentItems(selectedItems);
     setSelectedShipmentId(shipments[0]?.id || "__new__");
-    setNewShipmentName("");
+    setNewShipmentRecipientName("");
+    setNewShipmentType("Local");
+    setNewShipmentPointOfContact("");
+    setNewShipmentSupplyIds("");
     setIsShipmentModalOpen(true);
   }
 
   function closeShipmentModal() {
     setIsShipmentModalOpen(false);
     setPendingShipmentItems([]);
-    setNewShipmentName("");
+    setNewShipmentRecipientName("");
+    setNewShipmentType("Local");
+    setNewShipmentPointOfContact("");
+    setNewShipmentSupplyIds("");
+  }
+
+  function openCreateShipmentModal() {
+    setNewShipmentRecipientName("");
+    setNewShipmentType("Local");
+    setNewShipmentPointOfContact("");
+    setNewShipmentSupplyIds("");
+    setIsCreateShipmentModalOpen(true);
+  }
+
+  function closeCreateShipmentModal() {
+    setIsCreateShipmentModalOpen(false);
+    setNewShipmentRecipientName("");
+    setNewShipmentType("Local");
+    setNewShipmentPointOfContact("");
+    setNewShipmentSupplyIds("");
+  }
+
+  function parseSupplyIdsInput(value) {
+    return [...new Set(
+      value
+        .split(",")
+        .map((part) => Number(part.trim()))
+        .filter((part) => Number.isInteger(part) && part > 0)
+    )];
+  }
+
+  function itemsFromSupplyIds(value) {
+    const selectedIds = parseSupplyIdsInput(value);
+    return inventoryRowsWithStatus.filter((row) => selectedIds.includes(row.supplyId));
+  }
+
+  function buildShipmentRecord(recipientName, shipmentType, pointOfContact, items = []) {
+    return {
+      id: `shipment-${Date.now()}`,
+      recipientName,
+      shipmentType,
+      pointOfContact,
+      items,
+    };
   }
 
   function addItemToShipment() {
@@ -347,15 +395,19 @@ export default function App() {
       let targetShipmentId = selectedShipmentId;
 
       if (selectedShipmentId === "__new__") {
-        const shipmentName = newShipmentName.trim();
-        if (!shipmentName) {
+        const recipientName = newShipmentRecipientName.trim();
+        const shipmentType = newShipmentType;
+        const pointOfContact = newShipmentPointOfContact.trim();
+
+        if (!recipientName || !shipmentType || !pointOfContact) {
           return currentShipments;
         }
 
-        targetShipmentId = `shipment-${Date.now()}`;
+        const newShipment = buildShipmentRecord(recipientName, shipmentType, pointOfContact);
+        targetShipmentId = newShipment.id;
         workingShipments = [
           ...currentShipments,
-          { id: targetShipmentId, name: shipmentName, items: [] },
+          newShipment,
         ];
       }
 
@@ -378,6 +430,23 @@ export default function App() {
     setActiveShipmentSubtab("current");
     setSelectedInventoryIds([]);
     closeShipmentModal();
+  }
+
+  function createNewShipment() {
+    const recipientName = newShipmentRecipientName.trim();
+    const shipmentType = newShipmentType;
+    const pointOfContact = newShipmentPointOfContact.trim();
+    const shipmentItems = itemsFromSupplyIds(newShipmentSupplyIds);
+
+    if (!recipientName || !shipmentType || !pointOfContact) {
+      return;
+    }
+
+    setShipments((currentShipments) => [
+      ...currentShipments,
+      buildShipmentRecord(recipientName, shipmentType, pointOfContact, shipmentItems),
+    ]);
+    closeCreateShipmentModal();
   }
 
   function toggleInventorySelection(itemId) {
@@ -411,9 +480,9 @@ export default function App() {
 
     return (
       matchesSearch &&
-      row.valuation >= minValuation &&
-      row.valuation <= valuationLimit &&
-      matchesSelectedFilter(selectedStatuses, row.inventoryStatus) &&
+      row.valuation >= valuationRange.min &&
+      row.valuation <= valuationRange.max &&
+      (!showAvailableItems || row.inventoryStatus === "Inventory") &&
       matchesSelectedFilter(selectedExpiration, row.expirationFilter) &&
       matchesSelectedFilter(selectedDuration, row.durationFilter) &&
       matchesSelectedFilter(selectedCategories, row.category)
@@ -425,6 +494,45 @@ export default function App() {
   const allFilteredSelected =
     filteredInventoryRows.length > 0 &&
     filteredInventoryRows.every((row) => selectedInventoryIds.includes(row.id));
+  const normalizedShipmentSearch = shipmentSearchTerm.trim().toLowerCase();
+  const rankedShipments = [...shipments]
+    .map((shipment) => {
+      if (!normalizedShipmentSearch) {
+        return { shipment, score: 0 };
+      }
+
+      let score = 0;
+      const recipientName = shipment.recipientName.toLowerCase();
+      if (recipientName.includes(normalizedShipmentSearch)) {
+        score += recipientName === normalizedShipmentSearch ? 10 : 6;
+      }
+
+      shipment.items.forEach((item) => {
+        const exactSupplyName = item.exactSupplyName.toLowerCase();
+        const generalSupply = item.generalSupply.toLowerCase();
+        const manufacturer = item.manufacturer.toLowerCase();
+
+        if (exactSupplyName.includes(normalizedShipmentSearch)) {
+          score += exactSupplyName === normalizedShipmentSearch ? 5 : 3;
+        }
+        if (generalSupply.includes(normalizedShipmentSearch)) {
+          score += 2;
+        }
+        if (manufacturer.includes(normalizedShipmentSearch)) {
+          score += 2;
+        }
+      });
+
+      return { shipment, score };
+    })
+    .filter(({ shipment, score }) => !normalizedShipmentSearch || score > 0)
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+      return left.shipment.recipientName.localeCompare(right.shipment.recipientName);
+    })
+    .map(({ shipment }) => shipment);
   const expiryRanges = Object.entries(kpis?.expiry_ranges || {});
 
   return (
@@ -459,6 +567,17 @@ export default function App() {
               <h2>Every supply as a line item</h2>
             </div>
             <div className="inventory-actions">
+              <label className="availability-toggle">
+                <span>Show Available Items</span>
+                <button
+                  type="button"
+                  className={showAvailableItems ? "toggle-switch on" : "toggle-switch"}
+                  onClick={() => setShowAvailableItems((current) => !current)}
+                  aria-pressed={showAvailableItems}
+                >
+                  <span className="toggle-knob" />
+                </button>
+              </label>
               <button
                 type="button"
                 className="primary-button"
@@ -482,8 +601,8 @@ export default function App() {
                     setSelectedExpiration([]);
                     setSelectedDuration([]);
                     setSelectedCategories([]);
-                    setSelectedStatuses([]);
-                    setValuationLimit(maxValuation);
+                    setShowAvailableItems(false);
+                    setValuationRange({ min: minValuation, max: maxValuation });
                     setSearchTerm("");
                   }}
                 >
@@ -508,36 +627,59 @@ export default function App() {
               <div className="filter-group">
                 <h4>Valuation</h4>
                 <div className="valuation-summary">
-                  <span>{formatCurrency(minValuation)}</span>
-                  <span>{formatCurrency(valuationLimit)}</span>
+                  <span>{formatCurrency(valuationRange.min)}</span>
+                  <span>{formatCurrency(valuationRange.max)}</span>
                 </div>
-                <div className="valuation-sliders">
+                <div className="valuation-range-slider">
+                  <div className="valuation-range-track" />
+                  <div
+                    className="valuation-range-active"
+                    style={{
+                      left: `${
+                        maxValuation === minValuation
+                          ? 0
+                          : ((valuationRange.min - minValuation) / (maxValuation - minValuation)) *
+                            100
+                      }%`,
+                      right: `${
+                        maxValuation === minValuation
+                          ? 0
+                          : 100 -
+                            ((valuationRange.max - minValuation) / (maxValuation - minValuation)) *
+                              100
+                      }%`,
+                    }}
+                  />
                   <input
                     type="range"
                     min={minValuation}
                     max={maxValuation}
                     step="1"
-                    value={valuationLimit}
-                    onChange={(event) => setValuationLimit(Number(event.target.value))}
+                    value={valuationRange.min}
+                    onChange={(event) => {
+                      const nextMin = Number(event.target.value);
+                      setValuationRange((currentRange) => ({
+                        min: Math.min(nextMin, currentRange.max),
+                        max: currentRange.max,
+                      }));
+                    }}
+                  />
+                  <input
+                    className="valuation-range-input valuation-range-input-max"
+                    type="range"
+                    min={minValuation}
+                    max={maxValuation}
+                    step="1"
+                    value={valuationRange.max}
+                    onChange={(event) => {
+                      const nextMax = Number(event.target.value);
+                      setValuationRange((currentRange) => ({
+                        min: currentRange.min,
+                        max: Math.max(nextMax, currentRange.min),
+                      }));
+                    }}
                   />
                 </div>
-              </div>
-
-              <div className="filter-group">
-                <h4>Inventory Status</h4>
-                {statusOptions.map((option) => (
-                  <label key={option.value} className="filter-option">
-                    <input
-                      type="checkbox"
-                      checked={selectedStatuses.includes(option.value)}
-                      onChange={() =>
-                        toggleFilter(setSelectedStatuses, selectedStatuses, option.value)
-                      }
-                    />
-                    <span>{option.value}</span>
-                    <span className="filter-count">{option.count}</span>
-                  </label>
-                ))}
               </div>
 
               <div className="filter-group">
@@ -726,13 +868,6 @@ export default function App() {
 
       {!loading && !error && activeTab === "shipments" ? (
         <section className="panel empty-panel">
-          <div className="panel-header">
-            <div>
-              <p className="section-label">Shipments</p>
-              <h2>Shipment views</h2>
-            </div>
-          </div>
-
           <div className="shipment-subtabs" role="tablist" aria-label="Shipment subviews">
             <button
               type="button"
@@ -761,16 +896,42 @@ export default function App() {
           {activeShipmentSubtab === "current" ? (
             <div className="shipment-subpanel">
               <p className="section-label">Current Shipments</p>
-              {shipments.length === 0 ? (
-                <p>No current shipments yet.</p>
+              <div className="create-shipment-bar">
+                <input
+                  type="text"
+                  value={shipmentSearchTerm}
+                  onChange={(event) => setShipmentSearchTerm(event.target.value)}
+                  placeholder="Search shipments, supplies, or manufacturers"
+                />
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={openCreateShipmentModal}
+                >
+                  Create New Shipment
+                </button>
+              </div>
+              {rankedShipments.length === 0 ? (
+                <p>
+                  {shipments.length === 0
+                    ? "No current shipments yet."
+                    : "No shipments matched that search."}
+                </p>
               ) : (
                 <div className="shipment-list">
-                  {shipments.map((shipment) => (
+                  {rankedShipments.map((shipment) => (
                     <article key={shipment.id} className="shipment-card">
                       <div className="shipment-card-header">
                         <div>
-                          <h3>{shipment.name}</h3>
+                          <h3>{shipment.recipientName}</h3>
                           <p>{formatNumber(shipment.items.length)} assigned items</p>
+                          {shipment.shipmentType || shipment.pointOfContact ? (
+                            <p>
+                              {[shipment.shipmentType, shipment.pointOfContact]
+                                .filter(Boolean)
+                                .join(" | ")}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
 
@@ -780,12 +941,21 @@ export default function App() {
                         <div className="shipment-line-items">
                           {shipment.items.map((shipmentItem) => (
                             <div key={shipmentItem.id} className="shipment-line-item">
-                              <div>
-                                <strong>#{shipmentItem.supplyId}</strong> {shipmentItem.exactSupplyName}
+                              <div className="shipment-line-top">
+                                <div>
+                                  <strong>#{shipmentItem.supplyId}</strong> {shipmentItem.exactSupplyName}
+                                </div>
+                                <div className="shipment-expiration">
+                                  <span>{shipmentItem.expirationDate}</span>
+                                  <span
+                                    className={`expiration-pill ${shipmentItem.expirationStatus.tone}`}
+                                  >
+                                    {shipmentItem.expirationStatus.label}
+                                  </span>
+                                </div>
                               </div>
                               <div className="shipment-line-meta">
                                 <span>{shipmentItem.generalSupply}</span>
-                                <span>{shipmentItem.expirationDate}</span>
                               </div>
                             </div>
                           ))}
@@ -860,15 +1030,37 @@ export default function App() {
               </label>
 
               {selectedShipmentId === "__new__" ? (
-                <label className="modal-field">
-                  <span>New shipment name</span>
-                  <input
-                    type="text"
-                    value={newShipmentName}
-                    onChange={(event) => setNewShipmentName(event.target.value)}
-                    placeholder="Enter shipment name"
-                  />
-                </label>
+                <>
+                  <label className="modal-field">
+                    <span>Recipient Name</span>
+                    <input
+                      type="text"
+                      value={newShipmentRecipientName}
+                      onChange={(event) => setNewShipmentRecipientName(event.target.value)}
+                      placeholder="Enter recipient name"
+                    />
+                  </label>
+                  <label className="modal-field">
+                    <span>Shipment Type</span>
+                    <select
+                      value={newShipmentType}
+                      onChange={(event) => setNewShipmentType(event.target.value)}
+                    >
+                      <option value="Local">Local</option>
+                      <option value="National">National</option>
+                      <option value="International">International</option>
+                    </select>
+                  </label>
+                  <label className="modal-field">
+                    <span>Blueprints Point of Contact</span>
+                    <input
+                      type="text"
+                      value={newShipmentPointOfContact}
+                      onChange={(event) => setNewShipmentPointOfContact(event.target.value)}
+                      placeholder="Enter point of contact"
+                    />
+                  </label>
+                </>
               ) : null}
             </div>
 
@@ -878,6 +1070,82 @@ export default function App() {
               </button>
               <button type="button" className="primary-button" onClick={addItemToShipment}>
                 Add to shipment
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isCreateShipmentModalOpen ? (
+        <div className="modal-backdrop" role="presentation" onClick={closeCreateShipmentModal}>
+          <div
+            className="shipment-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-shipment-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">Create Shipment</p>
+                <h2 id="create-shipment-modal-title">New shipment details</h2>
+              </div>
+              <button type="button" className="modal-close" onClick={closeCreateShipmentModal}>
+                x
+              </button>
+            </div>
+
+            <div className="shipment-modal-body">
+              <label className="modal-field">
+                <span>Recipient Name</span>
+                <input
+                  type="text"
+                  value={newShipmentRecipientName}
+                  onChange={(event) => setNewShipmentRecipientName(event.target.value)}
+                  placeholder="Enter recipient name"
+                />
+              </label>
+              <label className="modal-field">
+                <span>Shipment Type</span>
+                <select
+                  value={newShipmentType}
+                  onChange={(event) => setNewShipmentType(event.target.value)}
+                >
+                  <option value="Local">Local</option>
+                  <option value="National">National</option>
+                  <option value="International">International</option>
+                </select>
+              </label>
+              <label className="modal-field">
+                <span>Blueprints Point of Contact</span>
+                <input
+                  type="text"
+                  value={newShipmentPointOfContact}
+                  onChange={(event) => setNewShipmentPointOfContact(event.target.value)}
+                  placeholder="Enter point of contact"
+                />
+              </label>
+              <label className="modal-field">
+                <span>Supply IDs</span>
+                <input
+                  type="text"
+                  value={newShipmentSupplyIds}
+                  onChange={(event) => setNewShipmentSupplyIds(event.target.value)}
+                  placeholder="Paste supply IDs separated by commas"
+                />
+              </label>
+            </div>
+
+            <div className="shipment-modal-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeCreateShipmentModal}
+              >
+                Cancel
+              </button>
+              <button type="button" className="primary-button" onClick={createNewShipment}>
+                Create Shipment
               </button>
             </div>
           </div>
