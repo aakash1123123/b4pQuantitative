@@ -1,30 +1,36 @@
-"""Placeholder module for Google Sheets interactions.
+import requests
+import csv
+from io import StringIO
 
-You can implement functions here using `gspread` or `pygsheets` to read/write
-inventory data from a shared Google Sheet that acts as the database.
-"""
+SHEET_URL = "YOUR_CSV_LINK_HERE"
 
-# Example using gspread (uncomment after installing and configuring credentials):
-# import gspread
-# from oauth2client.service_account import ServiceAccountCredentials
+def fetch_items_from_sheet():
+    response = requests.get(SHEET_URL)
+    response.raise_for_status()
 
-# def get_sheet_client():
-#     scope = [
-#         'https://spreadsheets.google.com/feeds',
-#         'https://www.googleapis.com/auth/drive',
-#     ]
-#     creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-#     client = gspread.authorize(creds)
-#     return client
+    csv_data = StringIO(response.text)
+    reader = csv.DictReader(csv_data)
 
-# def read_inventory(sheet_id: str):
-#     client = get_sheet_client()
-#     sheet = client.open_by_key(sheet_id).sheet1
-#     return sheet.get_all_records()
+    items = []
+    for row in reader:
+        try:
+            item = Item(
+                id=int(row["id"]),
+                name=row["name"],
+                gen_name=row["gen_name"],
+                category=row["category"],
+                manufacturer=row["manufacturer"],
+                quantity=int(row["quantity"]),
+                unit_value=float(row["unit_value"]),
+                total_value=float(row["total_value"]),
+                expiration_date=row.get("expiration_date") or None,
+                warehouse_date=row["warehouse_date"],
+                pallet_number=int(row["pallet_number"]),
+                category_box=row["category_box"],
+                box_number=int(row["box_number"]),
+            )
+            items.append(item)
+        except Exception as e:
+            print(f"Error parsing row: {row}, {e}")
 
-# def write_inventory(sheet_id: str, data: list):
-#     client = get_sheet_client()
-#     sheet = client.open_by_key(sheet_id).sheet1
-#     # implement write logic here
-
-# For now, the backend uses in-memory list (items_db) for prototyping.
+    return items
