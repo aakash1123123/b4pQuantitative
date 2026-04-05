@@ -142,10 +142,14 @@ function buildInventoryRows(items) {
   return items.map((item) => ({
     id: item.id,
     supplyId: item.id,
+    quantity: item.quantity || 0,
+    daysInWarehouse: item.days_in_warehouse ?? 0,
     generalSupply: item.gen_name || "Unspecified",
     exactSupplyName: item.name || "Unnamed supply",
     manufacturer: item.manufacturer || "Unknown",
     category: item.category || "Uncategorized",
+    imageUrl: item.image_url || "",
+    locationInfo: `Pallet ${item.pallet_number || "N/A"} • Box ${item.box_number || "N/A"}`,
     expirationDate: formatExpiration(item.expiration_date),
     expirationRaw: item.expiration_date || null,
     expirationDaysLeft: daysUntil(item.expiration_date || null),
@@ -215,6 +219,7 @@ export default function App() {
   const [valuationRange, setValuationRange] = useState({ min: 0, max: 0 });
   const [shipmentSearchTerm, setShipmentSearchTerm] = useState("");
   const [isCreateShipmentModalOpen, setIsCreateShipmentModalOpen] = useState(false);
+  const [detailsItem, setDetailsItem] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -469,6 +474,14 @@ export default function App() {
 
       return [...new Set([...currentIds, ...filteredIds])];
     });
+  }
+
+  function openDetailsModal(item) {
+    setDetailsItem(item);
+  }
+
+  function closeDetailsModal() {
+    setDetailsItem(null);
   }
 
   const filteredInventoryRows = inventoryRowsWithStatus.filter((row) => {
@@ -754,6 +767,7 @@ export default function App() {
                       <th>General Supply</th>
                       <th>Exact Supply Name</th>
                       <th>Expiration Date</th>
+                      <th>Quantity</th>
                       <th>Valuation</th>
                     </tr>
                   </thead>
@@ -768,7 +782,19 @@ export default function App() {
                             onChange={() => toggleInventorySelection(row.id)}
                           />
                         </td>
-                        <td>{row.supplyId}</td>
+                        <td>
+                          <div className="id-cell">
+                            <span>{row.supplyId}</span>
+                            <button
+                              type="button"
+                              className="info-icon-button"
+                              onClick={() => openDetailsModal(row)}
+                              aria-label={`Open details for supply ${row.supplyId}`}
+                            >
+                              ⓘ
+                            </button>
+                          </div>
+                        </td>
                         <td>
                           <span
                             className={
@@ -790,12 +816,13 @@ export default function App() {
                             </span>
                           </div>
                         </td>
+                        <td>{formatNumber(row.quantity)}</td>
                         <td>{formatCurrency(row.valuation)}</td>
                       </tr>
                     ))}
                     {filteredInventoryRows.length === 0 ? (
                       <tr>
-                        <td colSpan="7" className="empty-state-cell">
+                        <td colSpan="8" className="empty-state-cell">
                           No inventory items matched the current filters.
                         </td>
                       </tr>
@@ -942,8 +969,17 @@ export default function App() {
                           {shipment.items.map((shipmentItem) => (
                             <div key={shipmentItem.id} className="shipment-line-item">
                               <div className="shipment-line-top">
-                                <div>
-                                  <strong>#{shipmentItem.supplyId}</strong> {shipmentItem.exactSupplyName}
+                                <div className="shipment-item-id-row">
+                                  <strong>#{shipmentItem.supplyId}</strong>
+                                  <button
+                                    type="button"
+                                    className="info-icon-button"
+                                    onClick={() => openDetailsModal(shipmentItem)}
+                                    aria-label={`Open details for supply ${shipmentItem.supplyId}`}
+                                  >
+                                    ⓘ
+                                  </button>
+                                  <span>{shipmentItem.exactSupplyName}</span>
                                 </div>
                                 <div className="shipment-expiration">
                                   <span>{shipmentItem.expirationDate}</span>
@@ -1148,6 +1184,47 @@ export default function App() {
                 Create Shipment
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {detailsItem ? (
+        <div className="modal-backdrop" role="presentation" onClick={closeDetailsModal}>
+          <div
+            className="shipment-modal shipment-modal-large"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="details-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">Supply Details</p>
+                <h2 id="details-modal-title">Supply #{detailsItem.supplyId}</h2>
+              </div>
+              <button type="button" className="modal-close" onClick={closeDetailsModal}>
+                x
+              </button>
+            </div>
+
+            <div className="details-grid">
+              <div className="details-item"><span>Supply ID</span><strong>{detailsItem.supplyId}</strong></div>
+              <div className="details-item"><span>Days in Warehouse</span><strong>{formatNumber(detailsItem.daysInWarehouse)}</strong></div>
+              <div className="details-item"><span>Manufacturer Name</span><strong>{detailsItem.manufacturer}</strong></div>
+              <div className="details-item"><span>Category</span><strong>{detailsItem.category}</strong></div>
+              <div className="details-item"><span>General</span><strong>{detailsItem.generalSupply}</strong></div>
+              <div className="details-item"><span>Name</span><strong>{detailsItem.exactSupplyName}</strong></div>
+              <div className="details-item"><span>Location Information</span><strong>{detailsItem.locationInfo}</strong></div>
+              <div className="details-item"><span>Quantity</span><strong>{formatNumber(detailsItem.quantity)}</strong></div>
+              <div className="details-item"><span>Expiration Date</span><strong>{detailsItem.expirationDate}</strong></div>
+              <div className="details-item full"><span>Image URL</span><strong>{detailsItem.imageUrl || "Not available"}</strong></div>
+            </div>
+
+            {detailsItem.imageUrl ? (
+              <div className="details-image-wrap">
+                <img className="details-image" src={detailsItem.imageUrl} alt={detailsItem.exactSupplyName} />
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

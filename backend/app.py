@@ -39,6 +39,8 @@ class Item(BaseModel):
     gen_name: str
     category: str
     manufacturer: str
+    days_in_warehouse: int = 0
+    image_url: Optional[str] = None
     
     quantity: int
     unit_value: float
@@ -140,6 +142,8 @@ def fetch_items_from_sheet() -> List[Item]:
                 gen_name=(row.get("General") or "").strip(),
                 category=category or "Uncategorized",
                 manufacturer=manufacturer or "Unknown",
+                days_in_warehouse=days_in_warehouse,
+                image_url=(row.get("Image URL") or "").strip() or None,
                 quantity=quantity,
                 unit_value=unit_value,
                 total_value=total_value,
