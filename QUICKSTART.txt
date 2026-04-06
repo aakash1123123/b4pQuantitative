@@ -1,0 +1,55 @@
+# Quick Reference - Run Commands
+
+## Start Backend (Terminal 1)
+```powershell
+cd backend
+pip install -r requirements.txt
+uvicorn app:app --reload
+```
+→ Backend runs on **http://localhost:8000**
+
+## Start Frontend (Terminal 2)
+```powershell
+cd streamlit_app
+pip install -r requirements.txt
+streamlit run app.py
+```
+→ Frontend opens on **http://localhost:8501**
+
+## Google Sheets Setup (Optional)
+1. Save service account credentials as `backend/credentials.json`
+2. Set environment variable in PowerShell:
+   ```powershell
+   $env:GOOGLE_SHEET_NAME = "Your Sheet Name"
+   ```
+3. Restart backend - data loads automatically!
+
+## Check if Sheet Data Loaded
+```powershell
+curl http://localhost:8000/sheets-status
+```
+
+## API Endpoints
+- `GET http://localhost:8000/docs` - View API documentation
+- `POST http://localhost:8000/reload-sheets` - Manually refresh sheet data
+- `GET http://localhost:8000/sheets-status` - Check configuration status
+
+## Frontend Features
+- **Overview** - Key metrics
+- **Expiry Analysis** - Expiration date trends
+- **Duration Analysis** - Warehouse time tracking
+- **Category Breakdown** - By product category
+- **Top Supplies** - Most abundant items
+- **Pallet Analytics** - By pallet analysis
+- **Weekly Productivity** - Activity trends
+- **Add Item** - Manual data entry form (sidebar)
+
+## First Time Setup Checklist
+- [ ] Install Python 3.8+
+- [ ] Run `pip install -r requirements.txt` in both backend and streamlit_app folders
+- [ ] (Optional) Get Google Sheets credentials
+- [ ] (Optional) Save credentials as `backend/credentials.json`
+- [ ] (Optional) Set `GOOGLE_SHEET_NAME` environment variable
+- [ ] Start backend: `uvicorn app:app --reload` from backend folder
+- [ ] Start frontend: `streamlit run app.py` from streamlit_app folder
+- [ ] Open **http://localhost:8501** in browser

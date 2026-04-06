@@ -186,6 +186,14 @@ function buildFacetCounts(rows, key, preferredOrder = []) {
   }));
 }
 
+function percentOfTotal(value, total) {
+  if (!total) {
+    return 0;
+  }
+
+  return Math.round((value / total) * 1000) / 10;
+}
+
 function MetricCard({ label, value }) {
   return (
     <div className="metric-card">
@@ -547,6 +555,10 @@ export default function App() {
     })
     .map(({ shipment }) => shipment);
   const expiryRanges = Object.entries(kpis?.expiry_ranges || {});
+  const maxExpiryItems = expiryRanges.reduce((highest, [, values]) => {
+    const currentCount = values?.raw_items ?? 0;
+    return currentCount > highest ? currentCount : highest;
+  }, 0);
 
   return (
     <main className="page-shell">
@@ -867,28 +879,45 @@ export default function App() {
               </div>
             </div>
 
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Range</th>
-                    <th>Entries</th>
-                    <th>Raw Items</th>
-                    <th>Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {expiryRanges.map(([range, values]) => (
-                    <tr key={range}>
-                      <td>{range}</td>
-                      <td>{formatNumber(values.entries)}</td>
-                      <td>{formatNumber(values.raw_items)}</td>
-                      <td>{formatCurrency(values.value)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {expiryRanges.length > 0 ? (
+              <div className="expiry-chart-card">
+                <h4>Supplies by expiration bucket</h4>
+                <div className="expiry-bars">
+                  {expiryRanges.map(([range, values]) => {
+                    const rawItems = values?.raw_items ?? 0;
+                    const percentage = percentOfTotal(rawItems, kpis.total_raw_items);
+                    const width = maxExpiryItems > 0 ? (rawItems / maxExpiryItems) * 100 : 0;
+
+                    return (
+                      <div className="expiry-bar-row" key={range}>
+                        <div className="expiry-bar-labels">
+                          <strong>{range}</strong>
+                          <span>{formatNumber(rawItems)} items</span>
+                        </div>
+                        <div
+                          className="expiry-bar-track"
+                          aria-hidden="true"
+                        >
+                          <div
+                            className="expiry-bar-fill"
+                            style={{ width: `${width}%` }}
+                          />
+                        </div>
+                        <div className="expiry-bar-metrics">
+                          <span>{formatNumber(values?.entries ?? 0)} entries</span>
+                          <span>{percentage}% of inventory</span>
+                          <span>{formatCurrency(values?.value ?? 0)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            {expiryRanges.length === 0 ? (
+              <p>No expiration data is available yet.</p>
+            ) : null}
           </div>
         </section>
       ) : null}
