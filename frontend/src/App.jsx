@@ -194,6 +194,14 @@ function percentOfTotal(value, total) {
   return Math.round((value / total) * 1000) / 10;
 }
 
+function average(values) {
+  if (!values.length) {
+    return 0;
+  }
+
+  return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
 function MetricCard({ label, value }) {
   return (
     <div className="metric-card">
@@ -559,6 +567,64 @@ export default function App() {
     const currentCount = values?.raw_items ?? 0;
     return currentCount > highest ? currentCount : highest;
   }, 0);
+  const uniqueSupplyTypes = new Set(
+    inventoryRowsWithStatus.map((row) => row.generalSupply).filter(Boolean)
+  ).size;
+  const uniqueExactSupplies = new Set(
+    inventoryRowsWithStatus.map((row) => row.exactSupplyName).filter(Boolean)
+  ).size;
+  const uniqueCategories = new Set(
+    inventoryRowsWithStatus.map((row) => row.category).filter(Boolean)
+  ).size;
+  const expiredInventoryUnits = inventoryRowsWithStatus
+    .filter((row) => row.expirationDaysLeft !== null && row.expirationDaysLeft <= 0)
+    .reduce((total, row) => total + (row.quantity || 0), 0);
+  const expiringSoonInventoryUnits = inventoryRowsWithStatus
+    .filter((row) => row.expirationDaysLeft !== null && row.expirationDaysLeft > 0 && row.expirationDaysLeft <= 90)
+    .reduce((total, row) => total + (row.quantity || 0), 0);
+  const noExpirationInventoryUnits = inventoryRowsWithStatus
+    .filter((row) => row.expirationDaysLeft === null)
+    .reduce((total, row) => total + (row.quantity || 0), 0);
+  const slowMovingInventoryUnits = inventoryRowsWithStatus
+    .filter((row) => row.daysInWarehouse > 180)
+    .reduce((total, row) => total + (row.quantity || 0), 0);
+  const shipmentsWithItems = shipments.filter((shipment) => shipment.items.length > 0);
+  const totalShipmentUnits = shipments.reduce(
+    (total, shipment) =>
+      total +
+      shipment.items.reduce((shipmentTotal, item) => shipmentTotal + (item.quantity || 0), 0),
+    0
+  );
+  const totalShipmentLines = shipments.reduce((total, shipment) => total + shipment.items.length, 0);
+  const uniqueShipmentRecipients = new Set(
+    shipments.map((shipment) => shipment.recipientName).filter(Boolean)
+  ).size;
+  const averageUnitsPerShipment = average(
+    shipmentsWithItems.map((shipment) =>
+      shipment.items.reduce((shipmentTotal, item) => shipmentTotal + (item.quantity || 0), 0)
+    )
+  );
+  const shipmentsByType = ["Local", "National", "International"].map((type) => ({
+    type,
+    count: shipments.filter((shipment) => shipment.shipmentType === type).length,
+  }));
+  const maxShipmentTypeCount = shipmentsByType.reduce(
+    (highest, shipmentType) => Math.max(highest, shipmentType.count),
+    0
+  );
+  const nearExpiryShipmentUnits = shipments.reduce(
+    (total, shipment) =>
+      total +
+      shipment.items
+        .filter(
+          (item) => item.expirationDaysLeft !== null && item.expirationDaysLeft > 0 && item.expirationDaysLeft <= 90
+        )
+        .reduce((shipmentTotal, item) => shipmentTotal + (item.quantity || 0), 0),
+    0
+  );
+  const shippedCategoryCount = new Set(
+    shipments.flatMap((shipment) => shipment.items.map((item) => item.category)).filter(Boolean)
+  ).size;
 
   return (
     <main className="page-shell">
@@ -857,18 +923,21 @@ export default function App() {
           </div>
 
           <div className="metrics-grid">
-            <MetricCard label="Total Entries" value={formatNumber(kpis.total_entries)} />
-            <MetricCard label="Total Raw Items" value={formatNumber(kpis.total_raw_items)} />
-            <MetricCard label="Pallet Count" value={formatNumber(kpis.pallet_count)} />
-            <MetricCard label="Box Count" value={formatNumber(kpis.box_count)} />
+            <MetricCard label="Total Units On Hand" value={formatNumber(kpis.total_raw_items)} />
+            <MetricCard label="Distinct Supply Types" value={formatNumber(uniqueSupplyTypes)} />
+            <MetricCard label="Distinct Line Items" value={formatNumber(uniqueExactSupplies)} />
+            <MetricCard label="Supply Categories" value={formatNumber(uniqueCategories)} />
+            <MetricCard label="Expired Units" value={formatNumber(expiredInventoryUnits)} />
+            <MetricCard label="Expiring In 90 Days" value={formatNumber(expiringSoonInventoryUnits)} />
             <MetricCard
               label="Average Duration (Days)"
               value={(kpis.avg_duration_per_item ?? 0).toFixed(1)}
             />
-            <MetricCard
-              label="Total Value Placeholder"
-              value={formatCurrency(kpis.total_value)}
-            />
+            <MetricCard label="Slow-Moving Units" value={formatNumber(slowMovingInventoryUnits)} />
+            <MetricCard label="No Expiration Recorded" value={formatNumber(noExpirationInventoryUnits)} />
+            <MetricCard label="Pallet Count" value={formatNumber(kpis.pallet_count)} />
+            <MetricCard label="Box Count" value={formatNumber(kpis.box_count)} />
+            <MetricCard label="Estimated Inventory Value" value={formatCurrency(kpis.total_value)} />
           </div>
 
           <div className="summary-card">
@@ -1043,10 +1112,68 @@ export default function App() {
       ) : null}
 
       {!loading && !error && activeTab === "shipment-kpis" ? (
-        <section className="panel empty-panel">
-          <p className="section-label">Shipment KPIs</p>
-          <h2>Reserved for future shipment metrics</h2>
-          <p>Nothing is shown here yet by design.</p>
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="section-label">Shipment KPIs</p>
+              <h2>Shipment activity and outbound flow</h2>
+            </div>
+          </div>
+
+          <div className="metrics-grid">
+            <MetricCard label="Total Shipments" value={formatNumber(shipments.length)} />
+            <MetricCard label="Shipments With Items" value={formatNumber(shipmentsWithItems.length)} />
+            <MetricCard label="Total Units Assigned" value={formatNumber(totalShipmentUnits)} />
+            <MetricCard label="Total Shipment Line Items" value={formatNumber(totalShipmentLines)} />
+            <MetricCard label="Unique Recipients" value={formatNumber(uniqueShipmentRecipients)} />
+            <MetricCard label="Avg Units Per Shipment" value={formatNumber(Math.round(averageUnitsPerShipment))} />
+            <MetricCard label="Near-Expiry Units In Shipments" value={formatNumber(nearExpiryShipmentUnits)} />
+            <MetricCard label="Categories Being Shipped" value={formatNumber(shippedCategoryCount)} />
+          </div>
+
+          <div className="summary-card">
+            <div className="panel-header">
+              <div>
+                <p className="section-label">Shipment Mix</p>
+                <h3>Shipments by destination type</h3>
+              </div>
+            </div>
+
+            {shipmentsByType.length > 0 ? (
+              <div className="expiry-chart-card">
+                <div className="expiry-bars">
+                  {shipmentsByType.map((shipmentType) => {
+                    const width = maxShipmentTypeCount > 0
+                      ? (shipmentType.count / maxShipmentTypeCount) * 100
+                      : 0;
+
+                    return (
+                      <div className="expiry-bar-row" key={shipmentType.type}>
+                        <div className="expiry-bar-labels">
+                          <strong>{shipmentType.type}</strong>
+                          <span>{formatNumber(shipmentType.count)} shipments</span>
+                        </div>
+                        <div className="expiry-bar-track" aria-hidden="true">
+                          <div
+                            className="expiry-bar-fill expiry-bar-fill-secondary"
+                            style={{ width: `${width}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            <div className="kpi-note-card">
+              <p className="section-label">Next Metrics To Add</p>
+              <p>
+                Fill rate and request-to-shipment time will need request dates and requested quantities
+                added to the shipment data model.
+              </p>
+            </div>
+          </div>
         </section>
       ) : null}
 

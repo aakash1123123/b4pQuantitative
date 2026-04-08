@@ -187,6 +187,19 @@ table {
   font-family: "Space Grotesk", sans-serif;
 }
 
+.kpi-note-card {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: #f8fbff;
+  border: 1px solid #d6e4f3;
+  color: #365f8d;
+}
+
+.kpi-note-card p:last-child {
+  margin-bottom: 0;
+}
+
 .expiry-bars {
   display: grid;
   gap: 14px;
