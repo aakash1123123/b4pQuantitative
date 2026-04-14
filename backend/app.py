@@ -28,6 +28,33 @@ SHEET_URL = (
     f"?format=csv&gid={SHEET_GID}"
 )
 
+APPROVED_CATEGORIES = {
+    "Airway & Oxygen",
+    "Catheters & Briefs",
+    "Gloves",
+    "IV Supplies",
+    "Masks & Face Shields",
+    "Needles & Syringes",
+    "Sutures",
+    "Wound Care & Bandages",
+    "Vitals & Home Health",
+    "Apparel (Gowns, Shoe Covers, etc.)",
+    "Misc Surgical",
+    "Misc Non-Medical",
+}
+
+CATEGORY_ALIASES = {
+    "misc non‐medical": "Misc Non-Medical",
+    "misc non-medical": "Misc Non-Medical",
+    "misc non‑medical": "Misc Non-Medical",
+    "misc non–medical": "Misc Non-Medical",
+    "misc non—medical": "Misc Non-Medical",
+    "unspecified": "Misc Non-Medical",
+    "uncategorized": "Misc Non-Medical",
+    "medical supplies": "Misc Non-Medical",
+    "": "Misc Non-Medical",
+}
+
 
 
 # ==============================
@@ -106,6 +133,26 @@ def normalize_expiration_date(value: Any) -> str:
     return None
 
 
+def normalize_category(value: Any) -> str:
+    raw = str(value or "").strip()
+    if raw in APPROVED_CATEGORIES:
+        return raw
+
+    alias_key = (
+        raw.lower()
+        .replace("â\x80\x90", "-")
+        .replace("‐", "-")
+        .replace("‑", "-")
+        .replace("–", "-")
+        .replace("—", "-")
+    )
+    normalized = CATEGORY_ALIASES.get(alias_key)
+    if normalized:
+        return normalized
+
+    return raw or "Misc Non-Medical"
+
+
 # ==============================
 # FETCH DATA FROM GOOGLE SHEETS
 # ==============================
@@ -125,7 +172,7 @@ def fetch_items_from_sheet() -> List[Item]:
         try:
             name = (row.get("Name") or "").strip()
             manufacturer = (row.get("Manufacturer Name") or "").strip()
-            category = (row.get("Category") or "").strip()
+            category = normalize_category(row.get("Category"))
 
             if not any([name, manufacturer, category]):
                 continue
@@ -140,7 +187,7 @@ def fetch_items_from_sheet() -> List[Item]:
                 id=index,
                 name=name or f"Item {index}",
                 gen_name=(row.get("General") or "").strip(),
-                category=category or "Uncategorized",
+                category=category,
                 manufacturer=manufacturer or "Unknown",
                 days_in_warehouse=days_in_warehouse,
                 image_url=(row.get("Image URL") or "").strip() or None,
@@ -150,7 +197,7 @@ def fetch_items_from_sheet() -> List[Item]:
                 expiration_date=normalize_expiration_date(row.get("Date of Expiration")),
                 warehouse_date=warehouse_date,
                 pallet_number=parse_int(row.get("Pallet Number"), default=0),
-                category_box=category or "Unassigned",
+                category_box=category,
                 box_number=parse_int(row.get("Box Number"), default=0),
             )
             items.append(item)

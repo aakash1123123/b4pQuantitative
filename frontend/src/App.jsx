@@ -202,11 +202,198 @@ function average(values) {
   return values.reduce((total, value) => total + value, 0) / values.length;
 }
 
+const expirationBucketColors = {
+  "Already expired": "#111111",
+  "Already Expired": "#111111",
+  "0-90 days": "#d93025",
+  "90-180 days": "#f57c00",
+  "180-365 days": "#f4c542",
+  "365+ days": "#1e8e3e",
+  "No expiration": "#b7c9dc",
+  "No expiration date": "#b7c9dc",
+};
+
+const durationBucketColors = {
+  "0-30 days": "#dce9f8",
+  "31-90 days": "#a9c9ee",
+  "91-180 days": "#6fa2d9",
+  "181-365 days": "#356fae",
+  "365+ days": "#0d3b6f",
+  "Unknown duration": "#d8dde6",
+};
+
+const durationBucketOrder = [
+  "0-30 days",
+  "31-90 days",
+  "91-180 days",
+  "181-365 days",
+  "365+ days",
+];
+
+const categoryPiePalette = [
+  "#0d3b6f",
+  "#1f5f99",
+  "#2f7db6",
+  "#4b95c9",
+  "#6aaed6",
+  "#8bc2df",
+  "#4b6785",
+  "#5d7c9d",
+  "#7a96b2",
+  "#98b0c6",
+  "#b6cad9",
+  "#d2e0eb",
+];
+
+function buildPieChartBackground(segments) {
+  if (!segments.length) {
+    return "conic-gradient(#dfe9f5 0deg 360deg)";
+  }
+
+  let currentAngle = 0;
+  const stops = segments.map((segment) => {
+    const start = currentAngle;
+    const sweep = (segment.value / segment.total) * 360;
+    currentAngle += sweep;
+    return `${segment.color} ${start}deg ${currentAngle}deg`;
+  });
+
+  return `conic-gradient(${stops.join(", ")})`;
+}
+
+function buildPieChartSegments(segments) {
+  if (!segments.length) {
+    return [];
+  }
+
+  const center = 100;
+  const outerRadius = 100;
+  const innerRadius = 72;
+
+  function pointForAngle(angleInDegrees, radius) {
+    const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180;
+    return {
+      x: center + radius * Math.cos(angleInRadians),
+      y: center + radius * Math.sin(angleInRadians),
+    };
+  }
+
+  function buildDonutSlicePath(startAngle, endAngle) {
+    const outerStart = pointForAngle(startAngle, outerRadius);
+    const outerEnd = pointForAngle(endAngle, outerRadius);
+    const innerEnd = pointForAngle(endAngle, innerRadius);
+    const innerStart = pointForAngle(startAngle, innerRadius);
+    const largeArcFlag = endAngle - startAngle > 180 ? 1 : 0;
+
+    return [
+      `M ${outerStart.x} ${outerStart.y}`,
+      `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${outerEnd.x} ${outerEnd.y}`,
+      `L ${innerEnd.x} ${innerEnd.y}`,
+      `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${innerStart.x} ${innerStart.y}`,
+      "Z",
+    ].join(" ");
+  }
+
+  let currentAngle = 0;
+  return segments.map((segment) => {
+    const startAngle = currentAngle;
+    const sweep = segment.total ? (segment.value / segment.total) * 360 : 0;
+    const midAngle = currentAngle + sweep / 2;
+    currentAngle += sweep;
+
+    return {
+      ...segment,
+      startAngle,
+      endAngle: currentAngle,
+      midAngle,
+      path: buildDonutSlicePath(startAngle, currentAngle),
+    };
+  });
+}
+
 function MetricCard({ label, value }) {
   return (
     <div className="metric-card">
       <p className="metric-label">{label}</p>
       <p className="metric-value">{value}</p>
+    </div>
+  );
+}
+
+function PieChartCard({
+  title,
+  ariaLabel,
+  totalItems,
+  segments,
+  legendSegments = segments,
+  background,
+  activeLabel,
+  onHover,
+  cardClassName = "",
+}) {
+  const normalizedActiveLabel = (activeLabel || "").trim().toLowerCase();
+
+  return (
+    <div className={`expiry-chart-card compact ${cardClassName}`.trim()}>
+      <h4>{title}</h4>
+      <div className="expiration-pie-layout">
+        <div className="expiration-pie-wrap">
+          <div
+            className="expiration-pie-chart"
+            style={{ background }}
+            aria-label={ariaLabel}
+            role="img"
+            onMouseLeave={() => onHover(null)}
+          >
+            <svg className="pie-slice-layer" viewBox="0 0 200 200" aria-hidden="true">
+              {segments.map((segment) => (
+                <path
+                  key={segment.label}
+                  d={segment.path}
+                  className={
+                    normalizedActiveLabel === segment.label.trim().toLowerCase()
+                      ? "pie-slice-hotspot active"
+                      : "pie-slice-hotspot"
+                  }
+                  onPointerEnter={() => onHover(segment.label)}
+                  onPointerMove={() => onHover(segment.label)}
+                />
+              ))}
+            </svg>
+            <div className="expiration-pie-center">
+              <strong>{formatNumber(totalItems)}</strong>
+              <span>raw items</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="expiration-pie-legend">
+          {legendSegments.map((segment) => (
+            <div
+              className={
+                normalizedActiveLabel === segment.label.trim().toLowerCase()
+                  ? "expiration-pie-legend-row active"
+                  : "expiration-pie-legend-row"
+              }
+              key={segment.label}
+              onPointerEnter={() => onHover(segment.label)}
+              onPointerLeave={() => onHover(null)}
+            >
+                <span
+                  className="expiration-pie-swatch"
+                  style={{ backgroundColor: segment.color }}
+                  aria-hidden="true"
+                />
+              <div className="expiration-pie-copy">
+                <strong>{segment.label}</strong>
+                <span>
+                  {formatNumber(segment.value)} items • {segment.percentage}% of raw items
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -236,6 +423,9 @@ export default function App() {
   const [shipmentSearchTerm, setShipmentSearchTerm] = useState("");
   const [isCreateShipmentModalOpen, setIsCreateShipmentModalOpen] = useState(false);
   const [detailsItem, setDetailsItem] = useState(null);
+  const [activeExpirationPieLabel, setActiveExpirationPieLabel] = useState(null);
+  const [activeDurationPieLabel, setActiveDurationPieLabel] = useState(null);
+  const [activeCategoryPieLabel, setActiveCategoryPieLabel] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -317,14 +507,11 @@ export default function App() {
     "365+ days",
     "No expiration date",
   ]);
-  const durationOptions = buildFacetCounts(inventoryRowsWithStatus, "durationFilter", [
-    "0-30 days",
-    "31-90 days",
-    "91-180 days",
-    "181-365 days",
-    "365+ days",
-    "Unknown duration",
-  ]);
+  const durationOptions = buildFacetCounts(
+    inventoryRowsWithStatus.filter((row) => row.durationFilter !== "Unknown duration"),
+    "durationFilter",
+    durationBucketOrder
+  );
   const categoryOptions = buildFacetCounts(inventoryRowsWithStatus, "category");
 
   useEffect(() => {
@@ -563,10 +750,81 @@ export default function App() {
     })
     .map(({ shipment }) => shipment);
   const expiryRanges = Object.entries(kpis?.expiry_ranges || {});
-  const maxExpiryItems = expiryRanges.reduce((highest, [, values]) => {
-    const currentCount = values?.raw_items ?? 0;
-    return currentCount > highest ? currentCount : highest;
-  }, 0);
+  const expirationChartSegments = expiryRanges
+    .map(([range, values]) => ({
+      label: range,
+      value: values?.raw_items ?? 0,
+      entries: values?.entries ?? 0,
+      color: expirationBucketColors[range] || "#4a90e2",
+    }))
+    .filter((segment) => segment.value > 0);
+  const totalExpirationChartItems = expirationChartSegments.reduce(
+    (total, segment) => total + segment.value,
+    0
+  );
+  const expirationChartData = expirationChartSegments.map((segment) => ({
+    ...segment,
+    total: totalExpirationChartItems,
+    percentage: percentOfTotal(segment.value, totalExpirationChartItems),
+  }));
+  const expirationPieBackground = buildPieChartBackground(expirationChartData);
+  const expirationPieSegments = buildPieChartSegments(expirationChartData);
+  const durationChartData = durationBucketOrder.map((bucketLabel) => {
+    const matchingRows = inventoryRowsWithStatus.filter(
+      (row) => row.durationFilter === bucketLabel
+    );
+    const rawItems = matchingRows.reduce((total, row) => total + (row.quantity || 0), 0);
+
+    return {
+      label: bucketLabel,
+      value: rawItems,
+      entries: matchingRows.length,
+      color: durationBucketColors[bucketLabel] || "#4a90e2",
+    };
+  });
+  const totalDurationChartItems = durationChartData.reduce(
+    (total, segment) => total + segment.value,
+    0
+  );
+  const durationChartLegendData = durationChartData.map((segment) => ({
+    ...segment,
+    total: totalDurationChartItems,
+    percentage: percentOfTotal(segment.value, totalDurationChartItems),
+  }));
+  const durationPieBackground = buildPieChartBackground(
+    durationChartLegendData.filter((segment) => segment.value > 0)
+  );
+  const durationPieSegments = buildPieChartSegments(
+    durationChartLegendData.filter((segment) => segment.value > 0)
+  );
+  const categoryChartData = buildFacetCounts(inventoryRowsWithStatus, "category")
+    .map((bucket, index) => {
+      const matchingRows = inventoryRowsWithStatus.filter((row) => row.category === bucket.value);
+      const rawItems = matchingRows.reduce((total, row) => total + (row.quantity || 0), 0);
+
+      return {
+        label: bucket.value,
+        value: rawItems,
+        entries: bucket.count,
+        color: categoryPiePalette[index % categoryPiePalette.length],
+      };
+    })
+    .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label));
+  const totalCategoryChartItems = categoryChartData.reduce(
+    (total, segment) => total + segment.value,
+    0
+  );
+  const categoryChartLegendData = categoryChartData.map((segment) => ({
+    ...segment,
+    total: totalCategoryChartItems,
+    percentage: percentOfTotal(segment.value, totalCategoryChartItems),
+  }));
+  const categoryPieBackground = buildPieChartBackground(
+    categoryChartLegendData.filter((segment) => segment.value > 0)
+  );
+  const categoryPieSegments = buildPieChartSegments(
+    categoryChartLegendData.filter((segment) => segment.value > 0)
+  );
   const uniqueSupplyTypes = new Set(
     inventoryRowsWithStatus.map((row) => row.generalSupply).filter(Boolean)
   ).size;
@@ -940,53 +1198,80 @@ export default function App() {
             <MetricCard label="Estimated Inventory Value" value={formatCurrency(kpis.total_value)} />
           </div>
 
-          <div className="summary-card">
-            <div className="panel-header">
-              <div>
-                <p className="section-label">Expiration Summary</p>
-                <h3>Inventory at a glance by expiration window</h3>
-              </div>
-            </div>
-
-            {expiryRanges.length > 0 ? (
-              <div className="expiry-chart-card">
-                <h4>Supplies by expiration bucket</h4>
-                <div className="expiry-bars">
-                  {expiryRanges.map(([range, values]) => {
-                    const rawItems = values?.raw_items ?? 0;
-                    const percentage = percentOfTotal(rawItems, kpis.total_raw_items);
-                    const width = maxExpiryItems > 0 ? (rawItems / maxExpiryItems) * 100 : 0;
-
-                    return (
-                      <div className="expiry-bar-row" key={range}>
-                        <div className="expiry-bar-labels">
-                          <strong>{range}</strong>
-                          <span>{formatNumber(rawItems)} items</span>
-                        </div>
-                        <div
-                          className="expiry-bar-track"
-                          aria-hidden="true"
-                        >
-                          <div
-                            className="expiry-bar-fill"
-                            style={{ width: `${width}%` }}
-                          />
-                        </div>
-                        <div className="expiry-bar-metrics">
-                          <span>{formatNumber(values?.entries ?? 0)} entries</span>
-                          <span>{percentage}% of inventory</span>
-                          <span>{formatCurrency(values?.value ?? 0)}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
+          <div className="kpi-analytics-grid">
+            <div className="summary-card">
+              <div className="panel-header">
+                <div>
+                  <p className="section-label">Expiration Summary</p>
+                  <h3>Inventory at a glance by expiration window</h3>
                 </div>
               </div>
-            ) : null}
 
-            {expiryRanges.length === 0 ? (
-              <p>No expiration data is available yet.</p>
-            ) : null}
+              {expirationChartData.length > 0 ? (
+                <PieChartCard
+                  title="Supplies by expiration bucket"
+                  ariaLabel="Pie chart of inventory by expiration bucket"
+                  totalItems={totalExpirationChartItems}
+                  segments={expirationPieSegments}
+                  legendSegments={expirationChartData}
+                  background={expirationPieBackground}
+                  activeLabel={activeExpirationPieLabel}
+                  onHover={setActiveExpirationPieLabel}
+                />
+              ) : (
+                <p>No expiration data is available yet.</p>
+              )}
+            </div>
+
+            <div className="summary-card">
+              <div className="panel-header">
+                <div>
+                  <p className="section-label">Duration Summary</p>
+                  <h3>Inventory at a glance by warehouse duration</h3>
+                </div>
+              </div>
+
+              {durationChartLegendData.length > 0 ? (
+                <PieChartCard
+                  title="Supplies by duration bucket"
+                  ariaLabel="Pie chart of inventory by duration bucket"
+                  totalItems={totalDurationChartItems}
+                  segments={durationPieSegments}
+                  legendSegments={durationChartLegendData}
+                  background={durationPieBackground}
+                  activeLabel={activeDurationPieLabel}
+                  onHover={setActiveDurationPieLabel}
+                />
+              ) : (
+                <p>No duration data is available yet.</p>
+              )}
+            </div>
+
+            <div className="summary-card kpi-card-full">
+              <div className="panel-header">
+                <div>
+                  <p className="section-label">Category Summary</p>
+                  <h3>Inventory at a glance by supply category</h3>
+                </div>
+                <span className="pill">{formatNumber(uniqueCategories)} categories</span>
+              </div>
+
+              {categoryChartLegendData.length > 0 ? (
+                <PieChartCard
+                  title="Supplies by category"
+                  ariaLabel="Pie chart of inventory by supply category"
+                  totalItems={totalCategoryChartItems}
+                  segments={categoryPieSegments}
+                  legendSegments={categoryChartLegendData}
+                  background={categoryPieBackground}
+                  activeLabel={activeCategoryPieLabel}
+                  onHover={setActiveCategoryPieLabel}
+                  cardClassName="category-pie-card"
+                />
+              ) : (
+                <p>No category data is available yet.</p>
+              )}
+            </div>
           </div>
         </section>
       ) : null}
