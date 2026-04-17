@@ -6,7 +6,16 @@ from datetime import datetime, timedelta
 import requests
 import csv
 import re
+import os
+import json
 from io import StringIO
+
+try:
+    import gspread
+    from google.oauth2.service_account import Credentials
+except ImportError:  # pragma: no cover - optional until credentials are configured
+    gspread = None
+    Credentials = None
 
 app = FastAPI(title="Inventory Backend API")
 
@@ -61,11 +70,12 @@ CATEGORY_ALIASES = {
 # DATA MODELS
 # ==============================
 class Item(BaseModel):
-    id: int
+    id: str
     name: str
     gen_name: str
     category: str
     manufacturer: str
+    review_status: Optional[str] = None
     days_in_warehouse: int = 0
     image_url: Optional[str] = None
     
@@ -97,6 +107,16 @@ class KPIResponse(BaseModel):
     top_supplies_table: Dict[str, Dict]
     weekly_productivity_kpis: Dict[str, Dict]
     pallet_kpis: Dict[str, Dict]
+
+
+class QuantityUpdateRequest(BaseModel):
+    quantity: int
+
+
+class QuantityUpdateResponse(BaseModel):
+    item_id: str
+    quantity: int
+    total_value: float
 
 
 def parse_int(value: Any, default: int = 0) -> int:
@@ -153,6 +173,133 @@ def normalize_category(value: Any) -> str:
     return raw or "Misc Non-Medical"
 
 
+def normalize_item_id(row: Dict[str, Any], fallback_index: int) -> str:
+    candidate_headers = [
+        "Supply ID",
+        "Supply Id",
+        "Supply Ud",
+        "SupplyUD",
+        "ID",
+        "Id",
+        "SupplyId",
+        "Unique ID",
+        "Item ID",
+        "",
+    ]
+
+    for header in candidate_headers:
+        value = str(row.get(header) or "").strip()
+        if value:
+            return value
+
+    return str(fallback_index)
+
+
+def get_gspread_worksheet():
+    if gspread is None or Credentials is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Google Sheets write support is not installed on the backend yet.",
+        )
+
+    credentials_path = os.getenv("GOOGLE_SHEETS_CREDENTIALS_PATH")
+    credentials_json = os.getenv("GOOGLE_SHEETS_CREDENTIALS_JSON")
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ]
+
+    try:
+        if credentials_json:
+            info = json.loads(credentials_json)
+            credentials = Credentials.from_service_account_info(info, scopes=scopes)
+        elif credentials_path:
+            credentials = Credentials.from_service_account_file(credentials_path, scopes=scopes)
+        else:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Google Sheets credentials are not configured. Set "
+                    "GOOGLE_SHEETS_CREDENTIALS_PATH or GOOGLE_SHEETS_CREDENTIALS_JSON."
+                ),
+            )
+
+        client = gspread.authorize(credentials)
+        spreadsheet = client.open_by_key(SHEET_ID)
+        try:
+            return spreadsheet.get_worksheet_by_id(int(SHEET_GID))
+        except AttributeError:
+            for worksheet in spreadsheet.worksheets():
+                if str(worksheet.id) == str(SHEET_GID):
+                    return worksheet
+            raise HTTPException(status_code=500, detail="Configured worksheet could not be found.")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Unable to connect to Google Sheets: {exc}") from exc
+
+
+def update_sheet_quantity(item_id: str, quantity: int) -> QuantityUpdateResponse:
+    if quantity <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be greater than 0.")
+
+    worksheet = get_gspread_worksheet()
+    records = worksheet.get_all_records()
+    headers = worksheet.row_values(1)
+
+    supply_id_column = None
+    quantity_column = None
+    total_price_column = None
+    unit_price_column = None
+
+    for index, header in enumerate(headers, start=1):
+        normalized = str(header or "").strip().lower()
+        if normalized == "supply id":
+            supply_id_column = index
+        elif normalized == "quantity":
+            quantity_column = index
+        elif normalized == "total price":
+            total_price_column = index
+        elif normalized == "price per unit":
+            unit_price_column = index
+
+    if not supply_id_column or not quantity_column:
+        raise HTTPException(
+            status_code=500,
+            detail="Required Google Sheet columns (Supply ID, Quantity) were not found.",
+        )
+
+    row_number = None
+    unit_value = 0.0
+    for index, row in enumerate(records, start=2):
+        if str(row.get("Supply ID") or "").strip() == str(item_id).strip():
+            row_number = index
+            unit_value = parse_float(row.get("Price per unit"), 0.0)
+            break
+
+    if row_number is None:
+        raise HTTPException(status_code=404, detail=f"Supply ID {item_id} was not found in the sheet.")
+
+    updates = [
+        {
+            "range": gspread.utils.rowcol_to_a1(row_number, quantity_column),
+            "values": [[quantity]],
+        }
+    ]
+
+    total_value = round(unit_value * quantity, 2)
+    if total_price_column:
+        updates.append(
+            {
+                "range": gspread.utils.rowcol_to_a1(row_number, total_price_column),
+                "values": [[total_value]],
+            }
+        )
+
+    worksheet.batch_update(updates, value_input_option="USER_ENTERED")
+    return QuantityUpdateResponse(item_id=item_id, quantity=quantity, total_value=total_value)
+
+
 # ==============================
 # FETCH DATA FROM GOOGLE SHEETS
 # ==============================
@@ -180,15 +327,16 @@ def fetch_items_from_sheet() -> List[Item]:
             days_in_warehouse = parse_int(row.get("Days in Warehouse"))
             warehouse_date = (today - timedelta(days=days_in_warehouse)).isoformat()
             quantity = parse_int(row.get("Quantity"))
-            unit_value = parse_float(row.get("Unit Value"))
-            total_value = parse_float(row.get("Total Value"), quantity * unit_value)
+            unit_value = parse_float(row.get("Price per unit"), parse_float(row.get("Unit Value")))
+            total_value = parse_float(row.get("Total Price"), parse_float(row.get("Total Value"), quantity * unit_value))
 
             item = Item(
-                id=index,
+                id=normalize_item_id(row, index),
                 name=name or f"Item {index}",
                 gen_name=(row.get("General") or "").strip(),
                 category=category,
                 manufacturer=manufacturer or "Unknown",
+                review_status=(row.get("Review") or "").strip() or None,
                 days_in_warehouse=days_in_warehouse,
                 image_url=(row.get("Image URL") or "").strip() or None,
                 quantity=quantity,
@@ -197,7 +345,7 @@ def fetch_items_from_sheet() -> List[Item]:
                 expiration_date=normalize_expiration_date(row.get("Date of Expiration")),
                 warehouse_date=warehouse_date,
                 pallet_number=parse_int(row.get("Pallet Number"), default=0),
-                category_box=category,
+                category_box=(row.get("Box Category") or "").strip() or "Unassigned",
                 box_number=parse_int(row.get("Box Number"), default=0),
             )
             items.append(item)
@@ -305,3 +453,8 @@ def calculate_kpis():
         weekly_productivity_kpis={},
         pallet_kpis={}
     )
+
+
+@app.post("/items/{item_id}/quantity", response_model=QuantityUpdateResponse)
+def update_item_quantity(item_id: str, payload: QuantityUpdateRequest):
+    return update_sheet_quantity(item_id=item_id, quantity=payload.quantity)

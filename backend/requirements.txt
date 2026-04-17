@@ -2,6 +2,5 @@ fastapi
 uvicorn
 requests
 pydantic
-# Google Sheets client; choose one of the following
-#gspread
-#pygsheets
+gspread
+google-auth

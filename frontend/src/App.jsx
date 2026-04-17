@@ -16,6 +16,7 @@ const defaultShipments = [
     recipientName: "Shipment A",
     shipmentType: "Local",
     pointOfContact: "",
+    filterMode: "original",
     items: [],
   },
   {
@@ -23,9 +24,81 @@ const defaultShipments = [
     recipientName: "Shipment B",
     shipmentType: "Local",
     pointOfContact: "",
+    filterMode: "original",
     items: [],
   },
 ];
+
+const shipmentTypeOptions = ["Local", "International"];
+const transportTypeOptions = ["Car", "Boat", "Plane", "Other"];
+
+function normalizeShipmentType(value) {
+  return value === "National" ? "International" : value || "Local";
+}
+
+function getShipmentStatus(shipment) {
+  if (!shipment.items.length) {
+    return "Planning";
+  }
+
+  const consolidatedCount = shipment.items.filter((item) => item.isConsolidated).length;
+  if (consolidatedCount === 0) {
+    return "Planning";
+  }
+  if (consolidatedCount === shipment.items.length) {
+    return "Consolidation Complete";
+  }
+  return "Consolidating";
+}
+
+function normalizeRequestedQuantity(item) {
+  const maxQuantity = Number(item.quantity) || 0;
+  const requestedQuantity = Number(item.requestedQuantity);
+
+  if (!Number.isFinite(requestedQuantity) || requestedQuantity <= 0) {
+    return maxQuantity;
+  }
+
+  return Math.min(requestedQuantity, maxQuantity || requestedQuantity);
+}
+
+function normalizeShipmentItem(item) {
+  return {
+    ...item,
+    requestedQuantity: normalizeRequestedQuantity(item),
+  };
+}
+
+function buildDefaultConsolidationState(item) {
+  return {
+    exactMatch: null,
+    consolidatedQuantity: normalizeRequestedQuantity(item),
+    varianceReason: [],
+  };
+}
+
+function normalizeVarianceReasons(value) {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean);
+  }
+  if (typeof value === "string" && value.trim()) {
+    return [value.trim()];
+  }
+  return [];
+}
+
+function getAutomaticConsolidationReasons(requestedQuantity, totalQuantity, actualQuantity) {
+  if (actualQuantity <= requestedQuantity) {
+    return [];
+  }
+  if (requestedQuantity >= totalQuantity) {
+    return ["Found extra units"];
+  }
+  if (actualQuantity > totalQuantity) {
+    return ["Gave more than requested", "Found extra units"];
+  }
+  return ["Gave more than requested"];
+}
 
 function formatNumber(value) {
   return new Intl.NumberFormat("en-US").format(value ?? 0);
@@ -143,13 +216,20 @@ function buildInventoryRows(items) {
     id: item.id,
     supplyId: item.id,
     quantity: item.quantity || 0,
+    unitPrice: item.unit_value || 0,
+    palletSortValue: Number(item.pallet_number) || 0,
+    palletNumber: item.pallet_number ? String(item.pallet_number) : "Unassigned",
+    boxType: item.category_box || "Unassigned",
+    boxNumber: Number(item.box_number) || 0,
     daysInWarehouse: item.days_in_warehouse ?? 0,
     generalSupply: item.gen_name || "Unspecified",
     exactSupplyName: item.name || "Unnamed supply",
     manufacturer: item.manufacturer || "Unknown",
     category: item.category || "Uncategorized",
+    reviewStatus: item.review_status || "",
+    needsReview: (item.review_status || "").trim().toLowerCase() === "review needed",
     imageUrl: item.image_url || "",
-    locationInfo: `Pallet ${item.pallet_number || "N/A"} • Box ${item.box_number || "N/A"}`,
+    locationInfo: `Pallet ${item.pallet_number || "N/A"} - ${item.category_box || "Unassigned"} #${item.box_number || "N/A"}`,
     expirationDate: formatExpiration(item.expiration_date),
     expirationRaw: item.expiration_date || null,
     expirationDaysLeft: daysUntil(item.expiration_date || null),
@@ -157,16 +237,69 @@ function buildInventoryRows(items) {
     warehouseDate: item.warehouse_date || null,
     expirationFilter: expirationBucket(item.expiration_date || null),
     durationFilter: durationBucket(item.warehouse_date || null),
-    valuation: item.id === 1 ? 100 : 0,
+    valuation: item.total_value || 0,
   }));
+}
+
+function compareItemsByLocation(left, right) {
+  const palletDiff = (left.palletSortValue || 0) - (right.palletSortValue || 0);
+  if (palletDiff !== 0) {
+    return palletDiff;
+  }
+
+  const boxTypeDiff = (left.boxType || "").localeCompare(right.boxType || "");
+  if (boxTypeDiff !== 0) {
+    return boxTypeDiff;
+  }
+
+  const boxNumberDiff = (left.boxNumber || 0) - (right.boxNumber || 0);
+  if (boxNumberDiff !== 0) {
+    return boxNumberDiff;
+  }
+
+  return String(left.supplyId || "").localeCompare(String(right.supplyId || ""));
+}
+
+function sortItemsByLocation(items) {
+  return [...items].sort(compareItemsByLocation);
+}
+
+function sortItemsByExpiration(items) {
+  return [...items].sort((left, right) => {
+    const leftDays = left.expirationDaysLeft;
+    const rightDays = right.expirationDaysLeft;
+
+    if (leftDays === null && rightDays !== null) {
+      return 1;
+    }
+    if (leftDays !== null && rightDays === null) {
+      return -1;
+    }
+    if (leftDays !== null && rightDays !== null && leftDays !== rightDays) {
+      return leftDays - rightDays;
+    }
+
+    return compareItemsByLocation(left, right);
+  });
+}
+
+function getShipmentItemsForDisplay(shipment) {
+  if ((shipment.filterMode || "original") === "expiration") {
+    return sortItemsByExpiration(shipment.items);
+  }
+  if (shipment.filterMode === "location") {
+    return sortItemsByLocation(shipment.items);
+  }
+
+  return shipment.items;
 }
 
 function inventoryStatusForItem(itemId, shipments) {
   const isPulled = shipments.some((shipment) =>
-    shipment.items.some((shipmentItem) => shipmentItem.id === itemId)
+    shipment.items.some((shipmentItem) => String(shipmentItem.id) === String(itemId))
   );
 
-  return isPulled ? "Pulled" : "Inventory";
+  return isPulled ? "Pulled" : "Available";
 }
 
 function buildFacetCounts(rows, key, preferredOrder = []) {
@@ -409,11 +542,13 @@ export default function App() {
   const [selectedExpiration, setSelectedExpiration] = useState([]);
   const [selectedDuration, setSelectedDuration] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedPallets, setSelectedPallets] = useState([]);
+  const [selectedBoxTypes, setSelectedBoxTypes] = useState([]);
   const [showAvailableItems, setShowAvailableItems] = useState(false);
   const [shipments, setShipments] = useState(defaultShipments);
   const [isShipmentModalOpen, setIsShipmentModalOpen] = useState(false);
   const [pendingShipmentItems, setPendingShipmentItems] = useState([]);
-  const [selectedShipmentId, setSelectedShipmentId] = useState("shipment-1");
+  const [selectedShipmentId, setSelectedShipmentId] = useState("__new__");
   const [newShipmentRecipientName, setNewShipmentRecipientName] = useState("");
   const [newShipmentType, setNewShipmentType] = useState("Local");
   const [newShipmentPointOfContact, setNewShipmentPointOfContact] = useState("");
@@ -423,48 +558,70 @@ export default function App() {
   const [shipmentSearchTerm, setShipmentSearchTerm] = useState("");
   const [isCreateShipmentModalOpen, setIsCreateShipmentModalOpen] = useState(false);
   const [detailsItem, setDetailsItem] = useState(null);
+  const [returningShipmentItem, setReturningShipmentItem] = useState(null);
+  const [requestingShipmentItem, setRequestingShipmentItem] = useState(null);
+  const [consolidatingShipmentItem, setConsolidatingShipmentItem] = useState(null);
+  const [consolidationExactAnswer, setConsolidationExactAnswer] = useState(null);
+  const [consolidatedUnitsValue, setConsolidatedUnitsValue] = useState("");
+  const [consolidationVarianceReasons, setConsolidationVarianceReasons] = useState([]);
+  const [addingSupplyIdsShipmentId, setAddingSupplyIdsShipmentId] = useState(null);
+  const [shipmentSupplyIdsInput, setShipmentSupplyIdsInput] = useState("");
+  const [requestedUnitsValue, setRequestedUnitsValue] = useState("");
+  const [expandedShipmentIds, setExpandedShipmentIds] = useState([]);
+  const [editingShipmentField, setEditingShipmentField] = useState(null);
+  const [editingShipmentValue, setEditingShipmentValue] = useState("");
+  const [shippingShipmentId, setShippingShipmentId] = useState(null);
+  const [shipmentDate, setShipmentDate] = useState("");
+  const [transportType, setTransportType] = useState("Car");
+  const [transportTypeOther, setTransportTypeOther] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [deliveryDateMode, setDeliveryDateMode] = useState("date");
+  const [shipmentNotes, setShipmentNotes] = useState("");
   const [activeExpirationPieLabel, setActiveExpirationPieLabel] = useState(null);
   const [activeDurationPieLabel, setActiveDurationPieLabel] = useState(null);
   const [activeCategoryPieLabel, setActiveCategoryPieLabel] = useState(null);
 
+  async function refreshDashboard(showLoader = false) {
+    try {
+      if (showLoader) {
+        setLoading(true);
+      }
+      setError("");
+
+      const [itemsResponse, kpisResponse] = await Promise.all([
+        fetch(`${API_BASE}/items`),
+        fetch(`${API_BASE}/kpis`),
+      ]);
+
+      if (!itemsResponse.ok || !kpisResponse.ok) {
+        throw new Error("The dashboard could not load data from the backend.");
+      }
+
+      const [itemsData, kpisData] = await Promise.all([
+        itemsResponse.json(),
+        kpisResponse.json(),
+      ]);
+
+      setItems(itemsData);
+      setKpis(kpisData);
+    } catch (err) {
+      setError(err.message || "Something went wrong while loading the dashboard.");
+      throw err;
+    } finally {
+      if (showLoader) {
+        setLoading(false);
+      }
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
-    async function loadDashboard() {
-      try {
-        setLoading(true);
-        setError("");
-
-        const [itemsResponse, kpisResponse] = await Promise.all([
-          fetch(`${API_BASE}/items`),
-          fetch(`${API_BASE}/kpis`),
-        ]);
-
-        if (!itemsResponse.ok || !kpisResponse.ok) {
-          throw new Error("The dashboard could not load data from the backend.");
-        }
-
-        const [itemsData, kpisData] = await Promise.all([
-          itemsResponse.json(),
-          kpisResponse.json(),
-        ]);
-
-        if (!cancelled) {
-          setItems(itemsData);
-          setKpis(kpisData);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err.message || "Something went wrong while loading the dashboard.");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+    refreshDashboard(true).catch(() => {
+      if (cancelled) {
+        return;
       }
-    }
-
-    loadDashboard();
+    });
 
     return () => {
       cancelled = true;
@@ -475,7 +632,19 @@ export default function App() {
     try {
       const storedShipments = window.localStorage.getItem(SHIPMENT_STORAGE_KEY);
       if (storedShipments) {
-        setShipments(JSON.parse(storedShipments));
+        const parsedShipments = JSON.parse(storedShipments);
+        const normalizedShipments = (parsedShipments.length > 0 ? parsedShipments : defaultShipments)
+          .map((shipment) => ({
+            ...shipment,
+            shipmentType: normalizeShipmentType(shipment.shipmentType),
+            filterMode:
+              !shipment.filterMode || shipment.filterMode === "location"
+                ? "original"
+                : shipment.filterMode,
+            isCompleted: Boolean(shipment.isCompleted),
+            items: (shipment.items || []).map(normalizeShipmentItem),
+          }));
+        setShipments(normalizedShipments);
       }
     } catch (err) {
       console.error("Unable to restore shipments", err);
@@ -495,9 +664,9 @@ export default function App() {
     ...row,
     inventoryStatus: inventoryStatusForItem(row.id, shipments),
   }));
-  const valuationValues = inventoryRowsWithStatus.map((row) => row.valuation);
-  const minValuation = valuationValues.length > 0 ? Math.min(...valuationValues) : 0;
-  const maxValuation = valuationValues.length > 0 ? Math.max(...valuationValues) : 0;
+  const unitPriceValues = inventoryRowsWithStatus.map((row) => row.unitPrice);
+  const minUnitPrice = unitPriceValues.length > 0 ? Math.min(...unitPriceValues) : 0;
+  const maxUnitPrice = unitPriceValues.length > 0 ? Math.max(...unitPriceValues) : 0;
   const normalizedSearch = searchTerm.trim().toLowerCase();
   const expirationOptions = buildFacetCounts(inventoryRowsWithStatus, "expirationFilter", [
     "Already expired",
@@ -513,10 +682,23 @@ export default function App() {
     durationBucketOrder
   );
   const categoryOptions = buildFacetCounts(inventoryRowsWithStatus, "category");
+  const palletOptions = buildFacetCounts(inventoryRowsWithStatus, "palletNumber").sort(
+    (left, right) => {
+      const leftNumber = Number(left.value);
+      const rightNumber = Number(right.value);
+
+      if (!Number.isNaN(leftNumber) && !Number.isNaN(rightNumber)) {
+        return leftNumber - rightNumber;
+      }
+
+      return left.value.localeCompare(right.value);
+    }
+  );
+  const boxTypeOptions = buildFacetCounts(inventoryRowsWithStatus, "boxType");
 
   useEffect(() => {
-    setValuationRange({ min: minValuation, max: maxValuation });
-  }, [minValuation, maxValuation]);
+    setValuationRange({ min: minUnitPrice, max: maxUnitPrice });
+  }, [minUnitPrice, maxUnitPrice]);
 
   function matchesSelectedFilter(selectedValues, rowValue) {
     return selectedValues.length === 0 || selectedValues.includes(rowValue);
@@ -536,7 +718,7 @@ export default function App() {
     }
 
     setPendingShipmentItems(selectedItems);
-    setSelectedShipmentId(shipments[0]?.id || "__new__");
+    setSelectedShipmentId(currentShipments[0]?.id || "__new__");
     setNewShipmentRecipientName("");
     setNewShipmentType("Local");
     setNewShipmentPointOfContact("");
@@ -573,24 +755,35 @@ export default function App() {
     return [...new Set(
       value
         .split(",")
-        .map((part) => Number(part.trim()))
-        .filter((part) => Number.isInteger(part) && part > 0)
+        .map((part) => part.trim())
+        .filter(Boolean)
     )];
   }
 
   function itemsFromSupplyIds(value) {
     const selectedIds = parseSupplyIdsInput(value);
-    return inventoryRowsWithStatus.filter((row) => selectedIds.includes(row.supplyId));
+    return inventoryRowsWithStatus.filter((row) => selectedIds.includes(String(row.supplyId)));
   }
 
   function buildShipmentRecord(recipientName, shipmentType, pointOfContact, items = []) {
     return {
       id: `shipment-${Date.now()}`,
       recipientName,
-      shipmentType,
+      shipmentType: normalizeShipmentType(shipmentType),
       pointOfContact,
+      filterMode: "original",
       items,
     };
+  }
+
+  function setShipmentFilterMode(shipmentId, filterMode) {
+    setShipments((currentShipments) =>
+      currentShipments.map((shipment) =>
+        shipment.id === shipmentId
+          ? { ...shipment, filterMode }
+          : shipment
+      )
+    );
   }
 
   function addItemToShipment() {
@@ -624,8 +817,10 @@ export default function App() {
           return shipment;
         }
 
-        const existingIds = new Set(shipment.items.map((shipmentItem) => shipmentItem.id));
-        const newItems = pendingShipmentItems.filter((item) => !existingIds.has(item.id));
+        const existingIds = new Set(shipment.items.map((shipmentItem) => String(shipmentItem.id)));
+        const newItems = pendingShipmentItems
+          .filter((item) => !existingIds.has(String(item.id)))
+          .map(normalizeShipmentItem);
 
         return {
           ...shipment,
@@ -652,7 +847,12 @@ export default function App() {
 
     setShipments((currentShipments) => [
       ...currentShipments,
-      buildShipmentRecord(recipientName, shipmentType, pointOfContact, shipmentItems),
+      buildShipmentRecord(
+        recipientName,
+        shipmentType,
+        pointOfContact,
+        shipmentItems.map(normalizeShipmentItem)
+      ),
     ]);
     closeCreateShipmentModal();
   }
@@ -687,6 +887,372 @@ export default function App() {
     setDetailsItem(null);
   }
 
+  function openReturnToInventoryModal(shipmentId, shipmentItem) {
+    setReturningShipmentItem({ shipmentId, shipmentItem });
+  }
+
+  function closeReturnToInventoryModal() {
+    setReturningShipmentItem(null);
+  }
+
+  function openRequestedUnitsModal(shipmentId, shipmentItem) {
+    setRequestingShipmentItem({ shipmentId, shipmentItem });
+    setRequestedUnitsValue(
+      String(normalizeRequestedQuantity(shipmentItem) || shipmentItem.quantity || 0)
+    );
+  }
+
+  function closeRequestedUnitsModal() {
+    setRequestingShipmentItem(null);
+    setRequestedUnitsValue("");
+  }
+
+  function openConsolidationModal(shipmentId, shipmentItem) {
+    const requestedQuantity = normalizeRequestedQuantity(shipmentItem);
+    const existingDetails = shipmentItem.consolidationDetails || buildDefaultConsolidationState(shipmentItem);
+    setConsolidatingShipmentItem({ shipmentId, shipmentItem });
+    setConsolidationExactAnswer(existingDetails.exactMatch);
+    setConsolidatedUnitsValue(
+      String(existingDetails.consolidatedQuantity || requestedQuantity || shipmentItem.quantity || 0)
+    );
+    setConsolidationVarianceReasons(normalizeVarianceReasons(existingDetails.varianceReason));
+  }
+
+  function closeConsolidationModal() {
+    setConsolidatingShipmentItem(null);
+    setConsolidationExactAnswer(null);
+    setConsolidatedUnitsValue("");
+    setConsolidationVarianceReasons([]);
+  }
+
+  function openAddSupplyIdsModal(shipmentId) {
+    setAddingSupplyIdsShipmentId(shipmentId);
+    setShipmentSupplyIdsInput("");
+  }
+
+  function closeAddSupplyIdsModal() {
+    setAddingSupplyIdsShipmentId(null);
+    setShipmentSupplyIdsInput("");
+  }
+
+  function startEditingShipmentField(shipmentId, field, value) {
+    setEditingShipmentField({ shipmentId, field });
+    setEditingShipmentValue(value || "");
+  }
+
+  function saveShipmentFieldValue(shipmentId, field, rawValue) {
+    const nextValue = typeof rawValue === "string" ? rawValue.trim() : rawValue;
+
+    setShipments((currentShipments) =>
+      currentShipments.map((shipment) => {
+        if (shipment.id !== shipmentId) {
+          return shipment;
+        }
+
+        if (field === "shipmentType") {
+          return { ...shipment, shipmentType: normalizeShipmentType(rawValue) };
+        }
+
+        if (!nextValue) {
+          return shipment;
+        }
+
+        return { ...shipment, [field]: nextValue };
+      })
+    );
+  }
+
+  function saveEditingShipmentField() {
+    if (!editingShipmentField) {
+      return;
+    }
+
+    saveShipmentFieldValue(
+      editingShipmentField.shipmentId,
+      editingShipmentField.field,
+      editingShipmentValue
+    );
+    setEditingShipmentField(null);
+    setEditingShipmentValue("");
+  }
+
+  function cancelEditingShipmentField() {
+    setEditingShipmentField(null);
+    setEditingShipmentValue("");
+  }
+
+  function openShippingModal(shipmentId) {
+    setShippingShipmentId(shipmentId);
+    setShipmentDate("");
+    setTransportType("Car");
+    setTransportTypeOther("");
+    setDeliveryDate("");
+    setDeliveryDateMode("date");
+    setShipmentNotes("");
+  }
+
+  function closeShippingModal() {
+    setShippingShipmentId(null);
+    setShipmentDate("");
+    setTransportType("Car");
+    setTransportTypeOther("");
+    setDeliveryDate("");
+    setDeliveryDateMode("date");
+    setShipmentNotes("");
+  }
+
+  function toggleShipmentItemConsolidated(shipmentId, itemId) {
+    setShipments((currentShipments) =>
+      currentShipments.map((shipment) => {
+        if (shipment.id !== shipmentId) {
+          return shipment;
+        }
+
+        return {
+          ...shipment,
+          items: shipment.items.map((item) =>
+            String(item.id) === String(itemId)
+              ? { ...item, isConsolidated: !item.isConsolidated }
+              : item
+          ),
+        };
+      })
+    );
+  }
+
+  function returnShipmentItemToInventory() {
+    if (!returningShipmentItem) {
+      return;
+    }
+
+    setShipments((currentShipments) =>
+      currentShipments.map((shipment) => {
+        if (shipment.id !== returningShipmentItem.shipmentId) {
+          return shipment;
+        }
+
+        return {
+          ...shipment,
+          items: shipment.items.filter(
+            (item) => String(item.id) !== String(returningShipmentItem.shipmentItem.id)
+          ),
+        };
+      })
+    );
+    closeReturnToInventoryModal();
+  }
+
+  function saveRequestedUnits() {
+    if (!requestingShipmentItem) {
+      return;
+    }
+
+    const maxQuantity = Number(requestingShipmentItem.shipmentItem.quantity) || 0;
+    const parsedQuantity = Number(requestedUnitsValue);
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0 || parsedQuantity > maxQuantity) {
+      return;
+    }
+
+    setShipments((currentShipments) =>
+      currentShipments.map((shipment) => {
+        if (shipment.id !== requestingShipmentItem.shipmentId) {
+          return shipment;
+        }
+
+        return {
+          ...shipment,
+          items: shipment.items.map((item) =>
+            String(item.id) === String(requestingShipmentItem.shipmentItem.id)
+              ? { ...item, requestedQuantity: parsedQuantity }
+              : item
+          ),
+        };
+      })
+    );
+    closeRequestedUnitsModal();
+  }
+
+  async function saveConsolidation() {
+    if (!consolidatingShipmentItem || consolidationExactAnswer === null) {
+      return;
+    }
+
+    const requestedQuantity = normalizeRequestedQuantity(consolidatingShipmentItem.shipmentItem);
+    const supplyId = String(consolidatingShipmentItem.shipmentItem.supplyId);
+    const parsedQuantity = Number(consolidatedUnitsValue);
+    const consolidatedQuantity =
+      consolidationExactAnswer === true ? requestedQuantity : parsedQuantity;
+
+    if (
+      !Number.isFinite(consolidatedQuantity) ||
+      consolidatedQuantity <= 0
+    ) {
+      return;
+    }
+
+    if (
+      consolidationExactAnswer === false &&
+      consolidatedQuantity !== requestedQuantity &&
+      consolidationDifference < 0 &&
+      effectiveConsolidationVarianceReasons.length === 0
+    ) {
+      return;
+    }
+
+    const nextVarianceReasons =
+      consolidatedQuantity === requestedQuantity
+        ? []
+        : effectiveConsolidationVarianceReasons;
+    const shouldSyncFoundExtra = nextVarianceReasons.includes("Found extra units");
+
+    try {
+      if (shouldSyncFoundExtra) {
+        const response = await fetch(`${API_BASE}/items/${encodeURIComponent(supplyId)}/quantity`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ quantity: consolidatedQuantity }),
+        });
+
+        if (!response.ok) {
+          const errorPayload = await response.json().catch(() => null);
+          throw new Error(errorPayload?.detail || "Unable to update Google Sheet quantity.");
+        }
+      }
+
+      setShipments((currentShipments) =>
+        currentShipments.map((shipment) => ({
+          ...shipment,
+          items: shipment.items.map((item) => {
+            if (String(item.id) !== String(consolidatingShipmentItem.shipmentItem.id)) {
+              return item;
+            }
+
+            const nextQuantity = shouldSyncFoundExtra ? consolidatedQuantity : item.quantity;
+            const nextRequestedQuantity =
+              shouldSyncFoundExtra && requestedQuantity >= consolidationTargetItem.quantity
+                ? consolidatedQuantity
+                : item.requestedQuantity;
+
+            return {
+              ...item,
+              quantity: nextQuantity,
+              requestedQuantity: nextRequestedQuantity,
+              valuation: (item.unitPrice || 0) * nextQuantity,
+              isConsolidated: true,
+              consolidationDetails: {
+                exactMatch: consolidationExactAnswer,
+                consolidatedQuantity,
+                varianceReason: nextVarianceReasons,
+              },
+            };
+          }),
+        }))
+      );
+
+      if (shouldSyncFoundExtra) {
+        await refreshDashboard();
+      }
+      closeConsolidationModal();
+    } catch (err) {
+      setError(err.message || "Unable to save consolidation details.");
+    }
+  }
+
+  function addSuppliesToShipmentById() {
+    if (!addingSupplyIdsShipmentId) {
+      return;
+    }
+
+    const shipmentItems = itemsFromSupplyIds(shipmentSupplyIdsInput).map(normalizeShipmentItem);
+    if (shipmentItems.length === 0) {
+      return;
+    }
+
+    setShipments((currentShipments) =>
+      currentShipments.map((shipment) => {
+        if (shipment.id !== addingSupplyIdsShipmentId) {
+          return shipment;
+        }
+
+        const existingIds = new Set(shipment.items.map((shipmentItem) => String(shipmentItem.id)));
+        const newItems = shipmentItems.filter((item) => !existingIds.has(String(item.id)));
+
+        return {
+          ...shipment,
+          items: [...shipment.items, ...newItems],
+        };
+      })
+    );
+    closeAddSupplyIdsModal();
+  }
+
+  function consolidateAllShipmentItems(shipmentId) {
+    setShipments((currentShipments) =>
+      currentShipments.map((shipment) => {
+        if (shipment.id !== shipmentId) {
+          return shipment;
+        }
+
+        return {
+          ...shipment,
+          items: shipment.items.map((item) => ({
+            ...item,
+            isConsolidated: true,
+            consolidationDetails: {
+              exactMatch: true,
+              consolidatedQuantity: normalizeRequestedQuantity(item),
+              varianceReason: "",
+            },
+          })),
+        };
+      })
+    );
+  }
+
+  function markShipmentComplete() {
+    if (!shippingShipmentId) {
+      return;
+    }
+
+    const resolvedShipmentDate = shipmentDate.trim();
+    const resolvedTransportType = transportType === "Other"
+      ? transportTypeOther.trim()
+      : transportType;
+    const resolvedDeliveryDate = deliveryDateMode === "tbd"
+      ? "TBD"
+      : deliveryDate.trim();
+
+    if (!resolvedShipmentDate || !resolvedTransportType || !resolvedDeliveryDate) {
+      return;
+    }
+
+    setShipments((currentShipments) =>
+      currentShipments.map((shipment) =>
+        shipment.id === shippingShipmentId
+          ? {
+              ...shipment,
+              isCompleted: true,
+              shippedAt: resolvedShipmentDate,
+              transportType: resolvedTransportType,
+              deliveryDate: resolvedDeliveryDate,
+              shipmentNotes: shipmentNotes.trim(),
+            }
+          : shipment
+      )
+    );
+    closeShippingModal();
+  }
+
+  function toggleShipmentSupplies(shipmentId) {
+    setExpandedShipmentIds((currentIds) =>
+      currentIds.includes(shipmentId)
+        ? currentIds.filter((currentId) => currentId !== shipmentId)
+        : [...currentIds, shipmentId]
+    );
+  }
+
   const filteredInventoryRows = inventoryRowsWithStatus.filter((row) => {
     const matchesSearch =
       !normalizedSearch ||
@@ -696,9 +1262,11 @@ export default function App() {
 
     return (
       matchesSearch &&
-      row.valuation >= valuationRange.min &&
-      row.valuation <= valuationRange.max &&
-      (!showAvailableItems || row.inventoryStatus === "Inventory") &&
+      row.unitPrice >= valuationRange.min &&
+      row.unitPrice <= valuationRange.max &&
+      (!showAvailableItems || row.inventoryStatus === "Available") &&
+      matchesSelectedFilter(selectedPallets, row.palletNumber) &&
+      matchesSelectedFilter(selectedBoxTypes, row.boxType) &&
       matchesSelectedFilter(selectedExpiration, row.expirationFilter) &&
       matchesSelectedFilter(selectedDuration, row.durationFilter) &&
       matchesSelectedFilter(selectedCategories, row.category)
@@ -711,7 +1279,29 @@ export default function App() {
     filteredInventoryRows.length > 0 &&
     filteredInventoryRows.every((row) => selectedInventoryIds.includes(row.id));
   const normalizedShipmentSearch = shipmentSearchTerm.trim().toLowerCase();
-  const rankedShipments = [...shipments]
+  const currentShipments = shipments.filter((shipment) => !shipment.isCompleted);
+  const pastShipments = shipments.filter((shipment) => shipment.isCompleted);
+  const currentShipmentRequestMap = currentShipments.reduce((accumulator, shipment) => {
+    shipment.items.forEach((item) => {
+      const supplyId = String(item.supplyId || item.id || "");
+      if (!supplyId) {
+        return;
+      }
+
+      if (!accumulator[supplyId]) {
+        accumulator[supplyId] = [];
+      }
+
+      accumulator[supplyId].push({
+        shipmentId: shipment.id,
+        shipmentName: shipment.recipientName || "Unnamed shipment",
+        requestedQuantity: normalizeRequestedQuantity(item),
+      });
+    });
+
+    return accumulator;
+  }, {});
+  const rankedShipments = [...currentShipments]
     .map((shipment) => {
       if (!normalizedShipmentSearch) {
         return { shipment, score: 0 };
@@ -724,10 +1314,14 @@ export default function App() {
       }
 
       shipment.items.forEach((item) => {
+        const supplyId = String(item.supplyId || "").toLowerCase();
         const exactSupplyName = item.exactSupplyName.toLowerCase();
         const generalSupply = item.generalSupply.toLowerCase();
         const manufacturer = item.manufacturer.toLowerCase();
 
+        if (supplyId.includes(normalizedShipmentSearch)) {
+          score += supplyId === normalizedShipmentSearch ? 7 : 4;
+        }
         if (exactSupplyName.includes(normalizedShipmentSearch)) {
           score += exactSupplyName === normalizedShipmentSearch ? 5 : 3;
         }
@@ -749,6 +1343,54 @@ export default function App() {
       return left.shipment.recipientName.localeCompare(right.shipment.recipientName);
     })
     .map(({ shipment }) => shipment);
+  const shipmentDetailsComplete =
+    newShipmentRecipientName.trim() &&
+    newShipmentType &&
+    newShipmentPointOfContact.trim();
+  const consolidationTargetItem = consolidatingShipmentItem?.shipmentItem || null;
+  const consolidationRequestedQuantity = consolidationTargetItem
+    ? normalizeRequestedQuantity(consolidationTargetItem)
+    : 0;
+  const consolidationTotalQuantity = Number(consolidationTargetItem?.quantity) || 0;
+  const parsedConsolidatedUnitsValue = Number(consolidatedUnitsValue);
+  const consolidationHasValidUnits =
+    Number.isFinite(parsedConsolidatedUnitsValue) &&
+    parsedConsolidatedUnitsValue > 0;
+  const consolidationDifference = consolidationHasValidUnits
+    ? parsedConsolidatedUnitsValue - consolidationRequestedQuantity
+    : 0;
+  const consolidationRequestNote = consolidationTargetItem
+    ? consolidationRequestedQuantity === consolidationTotalQuantity
+      ? `Requested all ${formatNumber(consolidationTotalQuantity)} units`
+      : `Requested ${formatNumber(consolidationRequestedQuantity)} of ${formatNumber(consolidationTotalQuantity)} units`
+    : "";
+  const consolidationReasonOptions =
+    consolidationExactAnswer === false && consolidationHasValidUnits
+      ? consolidationDifference < 0
+        ? ["Found less units", "Gave less than requested"]
+        : []
+      : [];
+  const automaticConsolidationReasons =
+    consolidationExactAnswer === false && consolidationHasValidUnits
+      ? getAutomaticConsolidationReasons(
+          consolidationRequestedQuantity,
+          consolidationTotalQuantity,
+          parsedConsolidatedUnitsValue
+        )
+      : [];
+  const effectiveConsolidationVarianceReasons =
+    consolidationDifference > 0
+      ? automaticConsolidationReasons
+      : consolidationVarianceReasons;
+  const consolidationConfirmDisabled =
+    consolidationExactAnswer === null ||
+    (consolidationExactAnswer === false &&
+      (!consolidationHasValidUnits ||
+        (consolidationDifference < 0 && consolidationVarianceReasons.length === 0)));
+  const shippingDetailsComplete =
+    shipmentDate.trim() &&
+    (transportType !== "Other" || transportTypeOther.trim()) &&
+    (deliveryDateMode === "tbd" || deliveryDate.trim());
   const expiryRanges = Object.entries(kpis?.expiry_ranges || {});
   const expirationChartSegments = expiryRanges
     .map(([range, values]) => ({
@@ -862,9 +1504,9 @@ export default function App() {
       shipment.items.reduce((shipmentTotal, item) => shipmentTotal + (item.quantity || 0), 0)
     )
   );
-  const shipmentsByType = ["Local", "National", "International"].map((type) => ({
+  const shipmentsByType = shipmentTypeOptions.map((type) => ({
     type,
-    count: shipments.filter((shipment) => shipment.shipmentType === type).length,
+    count: shipments.filter((shipment) => normalizeShipmentType(shipment.shipmentType) === type).length,
   }));
   const maxShipmentTypeCount = shipmentsByType.reduce(
     (highest, shipmentType) => Math.max(highest, shipmentType.count),
@@ -950,8 +1592,10 @@ export default function App() {
                     setSelectedExpiration([]);
                     setSelectedDuration([]);
                     setSelectedCategories([]);
+                    setSelectedPallets([]);
+                    setSelectedBoxTypes([]);
                     setShowAvailableItems(false);
-                    setValuationRange({ min: minValuation, max: maxValuation });
+                    setValuationRange({ min: minUnitPrice, max: maxUnitPrice });
                     setSearchTerm("");
                   }}
                 >
@@ -974,7 +1618,7 @@ export default function App() {
               </div>
 
               <div className="filter-group">
-                <h4>Valuation</h4>
+                <h4>Price per Unit</h4>
                 <div className="valuation-summary">
                   <span>{formatCurrency(valuationRange.min)}</span>
                   <span>{formatCurrency(valuationRange.max)}</span>
@@ -985,24 +1629,24 @@ export default function App() {
                     className="valuation-range-active"
                     style={{
                       left: `${
-                        maxValuation === minValuation
+                        maxUnitPrice === minUnitPrice
                           ? 0
-                          : ((valuationRange.min - minValuation) / (maxValuation - minValuation)) *
+                          : ((valuationRange.min - minUnitPrice) / (maxUnitPrice - minUnitPrice)) *
                             100
                       }%`,
                       right: `${
-                        maxValuation === minValuation
+                        maxUnitPrice === minUnitPrice
                           ? 0
                           : 100 -
-                            ((valuationRange.max - minValuation) / (maxValuation - minValuation)) *
+                            ((valuationRange.max - minUnitPrice) / (maxUnitPrice - minUnitPrice)) *
                               100
                       }%`,
                     }}
                   />
                   <input
                     type="range"
-                    min={minValuation}
-                    max={maxValuation}
+                    min={minUnitPrice}
+                    max={maxUnitPrice}
                     step="1"
                     value={valuationRange.min}
                     onChange={(event) => {
@@ -1016,8 +1660,8 @@ export default function App() {
                   <input
                     className="valuation-range-input valuation-range-input-max"
                     type="range"
-                    min={minValuation}
-                    max={maxValuation}
+                    min={minUnitPrice}
+                    max={maxUnitPrice}
                     step="1"
                     value={valuationRange.max}
                     onChange={(event) => {
@@ -1029,6 +1673,40 @@ export default function App() {
                     }}
                   />
                 </div>
+              </div>
+
+              <div className="filter-group">
+                <h4>Pallet #</h4>
+                {palletOptions.map((option) => (
+                  <label key={option.value} className="filter-option">
+                    <input
+                      type="checkbox"
+                      checked={selectedPallets.includes(option.value)}
+                      onChange={() =>
+                        toggleFilter(setSelectedPallets, selectedPallets, option.value)
+                      }
+                    />
+                    <span>{option.value}</span>
+                    <span className="filter-count">{option.count}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="filter-group">
+                <h4>Box Type</h4>
+                {boxTypeOptions.map((option) => (
+                  <label key={option.value} className="filter-option">
+                    <input
+                      type="checkbox"
+                      checked={selectedBoxTypes.includes(option.value)}
+                      onChange={() =>
+                        toggleFilter(setSelectedBoxTypes, selectedBoxTypes, option.value)
+                      }
+                    />
+                    <span>{option.value}</span>
+                    <span className="filter-count">{option.count}</span>
+                  </label>
+                ))}
               </div>
 
               <div className="filter-group">
@@ -1104,12 +1782,16 @@ export default function App() {
                       <th>Exact Supply Name</th>
                       <th>Expiration Date</th>
                       <th>Quantity</th>
+                      <th>Per Unit Price</th>
                       <th>Valuation</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredInventoryRows.map((row) => (
-                      <tr key={row.id}>
+                      <tr
+                        key={row.id}
+                        className={row.needsReview ? "inventory-row-review" : undefined}
+                      >
                         <td>
                           <input
                             type="checkbox"
@@ -1120,7 +1802,6 @@ export default function App() {
                         </td>
                         <td>
                           <div className="id-cell">
-                            <span>{row.supplyId}</span>
                             <button
                               type="button"
                               className="info-icon-button"
@@ -1153,12 +1834,13 @@ export default function App() {
                           </div>
                         </td>
                         <td>{formatNumber(row.quantity)}</td>
+                        <td>{formatCurrency(row.unitPrice)}</td>
                         <td>{formatCurrency(row.valuation)}</td>
                       </tr>
                     ))}
                     {filteredInventoryRows.length === 0 ? (
                       <tr>
-                        <td colSpan="8" className="empty-state-cell">
+                        <td colSpan="9" className="empty-state-cell">
                           No inventory items matched the current filters.
                         </td>
                       </tr>
@@ -1311,7 +1993,7 @@ export default function App() {
                   type="text"
                   value={shipmentSearchTerm}
                   onChange={(event) => setShipmentSearchTerm(event.target.value)}
-                  placeholder="Search shipments, supplies, or manufacturers"
+                  placeholder="Search shipments, supply IDs, supplies, or manufacturers"
                 />
                 <button
                   type="button"
@@ -1323,63 +2005,349 @@ export default function App() {
               </div>
               {rankedShipments.length === 0 ? (
                 <p>
-                  {shipments.length === 0
+                  {currentShipments.length === 0
                     ? "No current shipments yet."
                     : "No shipments matched that search."}
                 </p>
               ) : (
                 <div className="shipment-list">
                   {rankedShipments.map((shipment) => (
-                    <article key={shipment.id} className="shipment-card">
+                    <article
+                      key={shipment.id}
+                      className={`shipment-card shipment-card-${getShipmentStatus(shipment).toLowerCase().replace(/\s+/g, "-")}`}
+                    >
+                      {(() => {
+                        const shipmentValuation = shipment.items.reduce(
+                          (total, item) => total + (item.valuation || 0),
+                          0
+                        );
+
+                        return (
                       <div className="shipment-card-header">
-                        <div>
-                          <h3>{shipment.recipientName}</h3>
-                          <p>{formatNumber(shipment.items.length)} assigned items</p>
-                          {shipment.shipmentType || shipment.pointOfContact ? (
-                            <p>
-                              {[shipment.shipmentType, shipment.pointOfContact]
-                                .filter(Boolean)
-                                .join(" | ")}
-                            </p>
-                          ) : null}
+                        <div className="shipment-card-title">
+                          <div className="shipment-inline-edit">
+                            {editingShipmentField?.shipmentId === shipment.id &&
+                            editingShipmentField?.field === "recipientName" ? (
+                              <input
+                                className="shipment-inline-input"
+                                type="text"
+                                value={editingShipmentValue}
+                                onChange={(event) => setEditingShipmentValue(event.target.value)}
+                                onBlur={saveEditingShipmentField}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") {
+                                    saveEditingShipmentField();
+                                  }
+                                  if (event.key === "Escape") {
+                                    cancelEditingShipmentField();
+                                  }
+                                }}
+                                autoFocus
+                              />
+                            ) : (
+                              <h3>{shipment.recipientName}</h3>
+                            )}
+                            <button
+                              type="button"
+                              className="edit-icon-button"
+                              aria-label={`Edit name for ${shipment.recipientName}`}
+                              onClick={() =>
+                                startEditingShipmentField(
+                                  shipment.id,
+                                  "recipientName",
+                                  shipment.recipientName
+                                )
+                              }
+                            >
+                              ✎
+                            </button>
+                          </div>
+                          <p className="shipment-card-subline">
+                            {formatNumber(shipment.items.length)} assigned items
+                          </p>
+                          <p className="shipment-card-subline shipment-card-valuation">
+                            {formatCurrency(shipmentValuation)} valuation
+                          </p>
+                          <div className="shipment-inline-edit shipment-card-subline shipment-inline-field">
+                            <span className="shipment-inline-label">Type:</span>
+                            {editingShipmentField?.shipmentId === shipment.id &&
+                            editingShipmentField?.field === "shipmentType" ? (
+                              <select
+                                className="shipment-inline-select"
+                                value={editingShipmentValue}
+                                onChange={(event) => {
+                                  const nextValue = event.target.value;
+                                  setEditingShipmentValue(nextValue);
+                                  saveShipmentFieldValue(
+                                    shipment.id,
+                                    "shipmentType",
+                                    nextValue
+                                  );
+                                  setEditingShipmentField(null);
+                                  setEditingShipmentValue("");
+                                }}
+                                onBlur={cancelEditingShipmentField}
+                                autoFocus
+                              >
+                                {shipmentTypeOptions.map((option) => (
+                                  <option key={option} value={option}>{option}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span>{shipment.shipmentType || "No shipment type"}</span>
+                            )}
+                            <button
+                              type="button"
+                              className="edit-icon-button"
+                              aria-label={`Edit shipment type for ${shipment.recipientName}`}
+                              onClick={() =>
+                                startEditingShipmentField(
+                                  shipment.id,
+                                  "shipmentType",
+                                  shipment.shipmentType || "Local"
+                                )
+                              }
+                            >
+                              ✎
+                            </button>
+                          </div>
+                          <div className="shipment-inline-edit shipment-card-subline shipment-inline-field">
+                            <span className="shipment-inline-label">PoC:</span>
+                            {editingShipmentField?.shipmentId === shipment.id &&
+                            editingShipmentField?.field === "pointOfContact" ? (
+                              <input
+                                className="shipment-inline-input"
+                                type="text"
+                                value={editingShipmentValue}
+                                onChange={(event) => setEditingShipmentValue(event.target.value)}
+                                onBlur={saveEditingShipmentField}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") {
+                                    saveEditingShipmentField();
+                                  }
+                                  if (event.key === "Escape") {
+                                    cancelEditingShipmentField();
+                                  }
+                                }}
+                                autoFocus
+                              />
+                            ) : (
+                              <span>{shipment.pointOfContact || "No point of contact"}</span>
+                            )}
+                            <button
+                              type="button"
+                              className="edit-icon-button"
+                              aria-label={`Edit point of contact for ${shipment.recipientName}`}
+                              onClick={() =>
+                                startEditingShipmentField(
+                                  shipment.id,
+                                  "pointOfContact",
+                                  shipment.pointOfContact
+                                )
+                              }
+                            >
+                              ✎
+                            </button>
+                          </div>
+                        </div>
+                        <div className="shipment-status-panel">
+                          <div className="shipment-status-column">
+                            <span className="shipment-status-label">Shipment Status</span>
+                            <span className="shipment-status-badge">
+                              {getShipmentStatus(shipment)}
+                            </span>
+                          </div>
+                          <div className="shipment-filter-panel">
+                            <span className="shipment-filter-label">Filter Status</span>
+                            <div className="shipment-filter-buttons">
+                              <button
+                                type="button"
+                                className={
+                                  (shipment.filterMode || "original") === "original"
+                                    ? "secondary-button filter-toggle-button is-active"
+                                    : "secondary-button filter-toggle-button"
+                                }
+                                onClick={() => setShipmentFilterMode(shipment.id, "original")}
+                              >
+                                Use Add Order Filter
+                              </button>
+                              <button
+                                type="button"
+                                className={
+                                  shipment.filterMode === "location"
+                                    ? "secondary-button filter-toggle-button is-active"
+                                    : "secondary-button filter-toggle-button"
+                                }
+                                onClick={() => setShipmentFilterMode(shipment.id, "location")}
+                              >
+                                Use Location Filter
+                              </button>
+                              <button
+                                type="button"
+                                className={
+                                  shipment.filterMode === "expiration"
+                                    ? "secondary-button filter-toggle-button is-active"
+                                    : "secondary-button filter-toggle-button"
+                                }
+                                onClick={() => setShipmentFilterMode(shipment.id, "expiration")}
+                              >
+                                Use Expiration Filter
+                              </button>
+                            </div>
+                          </div>
+                          <div className="shipment-action-column">
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              onClick={() => consolidateAllShipmentItems(shipment.id)}
+                              disabled={shipment.items.length === 0}
+                            >
+                              Consolidate All
+                            </button>
+                          </div>
+                        </div>
+                        <div className="shipment-card-actions">
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => toggleShipmentSupplies(shipment.id)}
+                          >
+                            {expandedShipmentIds.includes(shipment.id)
+                              ? "Hide Supplies"
+                              : "Show Supplies"}
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => openAddSupplyIdsModal(shipment.id)}
+                          >
+                            Add Supplies via ID
+                          </button>
+                          <button
+                            type="button"
+                            className="primary-button"
+                            onClick={() => openShippingModal(shipment.id)}
+                            disabled={
+                              getShipmentStatus(shipment) !==
+                              "Consolidation Complete"
+                            }
+                          >
+                            Shipped
+                          </button>
                         </div>
                       </div>
+                        );
+                      })()}
 
                       {shipment.items.length === 0 ? (
                         <p className="shipment-empty">No items have been added yet.</p>
-                      ) : (
+                      ) : expandedShipmentIds.includes(shipment.id) ? (
                         <div className="shipment-line-items">
-                          {shipment.items.map((shipmentItem) => (
-                            <div key={shipmentItem.id} className="shipment-line-item">
-                              <div className="shipment-line-top">
-                                <div className="shipment-item-id-row">
-                                  <strong>#{shipmentItem.supplyId}</strong>
+                          {getShipmentItemsForDisplay(shipment).map((shipmentItem) => {
+                            const requestedQuantity = normalizeRequestedQuantity(shipmentItem);
+                            const isRequestingAllUnits =
+                              requestedQuantity === (Number(shipmentItem.quantity) || 0);
+                            const otherShipmentRequests = (
+                              currentShipmentRequestMap[String(shipmentItem.supplyId || shipmentItem.id)] || []
+                            ).filter((request) => request.shipmentId !== shipment.id);
+                            const requestConflictLabel = otherShipmentRequests
+                              .map(
+                                (request) =>
+                                  `${formatNumber(request.requestedQuantity)} units also requested by ${request.shipmentName}`
+                              )
+                              .join(" • ");
+
+                            return (
+                              <div
+                                key={shipmentItem.id}
+                                className={[
+                                  "shipment-line-item",
+                                  shipmentItem.isConsolidated ? "is-consolidated" : "",
+                                  otherShipmentRequests.length > 0 ? "is-conflicted" : "",
+                                ]
+                                  .filter(Boolean)
+                                  .join(" ")}
+                              >
+                                <div className="shipment-line-top">
+                                  <div className="shipment-item-id-row">
+                                    <strong>#{shipmentItem.supplyId}</strong>
+                                    <button
+                                      type="button"
+                                      className="info-icon-button"
+                                      onClick={() => openDetailsModal(shipmentItem)}
+                                      aria-label={`Open details for supply ${shipmentItem.supplyId}`}
+                                    >
+                                      ⓘ
+                                    </button>
+                                    <span>{shipmentItem.exactSupplyName}</span>
+                                  </div>
+                                  <div className="shipment-line-middle">
+                                    <strong>{shipmentItem.locationInfo}</strong>
+                                    <strong>{formatNumber(shipmentItem.quantity)} units</strong>
                                   <button
                                     type="button"
-                                    className="info-icon-button"
-                                    onClick={() => openDetailsModal(shipmentItem)}
-                                    aria-label={`Open details for supply ${shipmentItem.supplyId}`}
-                                  >
-                                    ⓘ
+                                    className={
+                                      isRequestingAllUnits
+                                        ? "requested-units-button"
+                                          : "requested-units-button is-partial"
+                                      }
+                                      onClick={() =>
+                                        openRequestedUnitsModal(shipment.id, shipmentItem)
+                                      }
+                                    >
+                                    {isRequestingAllUnits
+                                      ? "Requested All Units"
+                                      : `Requested ${formatNumber(requestedQuantity)} Units`}
                                   </button>
-                                  <span>{shipmentItem.exactSupplyName}</span>
+                                  {otherShipmentRequests.length > 0 ? (
+                                    <span className="shipment-request-conflict">
+                                      {requestConflictLabel}
+                                    </span>
+                                  ) : null}
                                 </div>
-                                <div className="shipment-expiration">
-                                  <span>{shipmentItem.expirationDate}</span>
-                                  <span
-                                    className={`expiration-pill ${shipmentItem.expirationStatus.tone}`}
+                                  <div className="shipment-line-pricing">
+                                    <span>{formatCurrency(shipmentItem.unitPrice)} per unit</span>
+                                    <span>{formatCurrency(shipmentItem.valuation)} total</span>
+                                  </div>
+                                  <div className="shipment-expiration">
+                                    <span>{shipmentItem.expirationDate}</span>
+                                    <span
+                                      className={`expiration-pill ${shipmentItem.expirationStatus.tone}`}
+                                    >
+                                      {shipmentItem.expirationStatus.label}
+                                    </span>
+                                  </div>
+                                  <div className="shipment-line-actions">
+                                  <button
+                                    type="button"
+                                    className={
+                                      shipmentItem.isConsolidated
+                                        ? "consolidated-button is-consolidated"
+                                        : "consolidated-button"
+                                    }
+                                    onClick={() => openConsolidationModal(shipment.id, shipmentItem)}
                                   >
-                                    {shipmentItem.expirationStatus.label}
-                                  </span>
+                                    Consolidated
+                                  </button>
+                                    <button
+                                      type="button"
+                                      className="secondary-button shipment-return-button"
+                                      onClick={() =>
+                                        openReturnToInventoryModal(shipment.id, shipmentItem)
+                                      }
+                                    >
+                                      Back to Inventory
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="shipment-line-meta">
+                                  <span>{shipmentItem.generalSupply}</span>
                                 </div>
                               </div>
-                              <div className="shipment-line-meta">
-                                <span>{shipmentItem.generalSupply}</span>
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
-                      )}
+                      ) : null}
                     </article>
                   ))}
                 </div>
@@ -1390,7 +2358,38 @@ export default function App() {
           {activeShipmentSubtab === "past" ? (
             <div className="shipment-subpanel">
               <p className="section-label">Past Shipments</p>
-              <p>This view is ready for completed shipment history.</p>
+              {pastShipments.length === 0 ? (
+                <p>No past shipments yet.</p>
+              ) : (
+                <div className="shipment-list">
+                  {pastShipments.map((shipment) => {
+                    const shipmentValuation = shipment.items.reduce(
+                      (total, item) => total + (item.valuation || 0),
+                      0
+                    );
+
+                    return (
+                      <article key={shipment.id} className="shipment-card shipment-card-complete">
+                        <div className="shipment-card-header">
+                          <div className="shipment-card-title">
+                            <h3>{shipment.recipientName}</h3>
+                            <p className="shipment-card-subline">
+                              {formatNumber(shipment.items.length)} assigned items
+                            </p>
+                            <p className="shipment-card-subline shipment-card-valuation">
+                              {formatCurrency(shipmentValuation)} valuation
+                            </p>
+                          </div>
+                          <div className="shipment-status-panel">
+                            <span className="shipment-status-label">Shipment Status</span>
+                            <span className="shipment-status-badge">Shipped</span>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           ) : null}
         </section>
@@ -1497,9 +2496,9 @@ export default function App() {
                   value={selectedShipmentId}
                   onChange={(event) => setSelectedShipmentId(event.target.value)}
                 >
-                  {shipments.map((shipment) => (
+                  {currentShipments.map((shipment) => (
                     <option key={shipment.id} value={shipment.id}>
-                      {shipment.name}
+                      {shipment.recipientName || shipment.name || shipment.id}
                     </option>
                   ))}
                   <option value="__new__">Create new shipment</option>
@@ -1523,9 +2522,9 @@ export default function App() {
                       value={newShipmentType}
                       onChange={(event) => setNewShipmentType(event.target.value)}
                     >
-                      <option value="Local">Local</option>
-                      <option value="National">National</option>
-                      <option value="International">International</option>
+                      {shipmentTypeOptions.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
                     </select>
                   </label>
                   <label className="modal-field">
@@ -1545,8 +2544,140 @@ export default function App() {
               <button type="button" className="secondary-button" onClick={closeShipmentModal}>
                 Cancel
               </button>
-              <button type="button" className="primary-button" onClick={addItemToShipment}>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={addItemToShipment}
+                disabled={selectedShipmentId === "__new__" && !shipmentDetailsComplete}
+              >
                 Add to shipment
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {shippingShipmentId ? (
+        <div className="modal-backdrop" role="presentation" onClick={closeShippingModal}>
+          <div
+            className="shipment-modal shipment-modal-large"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shipping-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">Shipped</p>
+                <h2 id="shipping-modal-title">Shipment details</h2>
+              </div>
+              <button type="button" className="modal-close" onClick={closeShippingModal}>
+                x
+              </button>
+            </div>
+
+            <div className="shipment-modal-body">
+              <label className="modal-field">
+                <span>Shipment Date</span>
+                <input
+                  type="date"
+                  value={shipmentDate}
+                  onChange={(event) => {
+                    setShipmentDate(event.target.value);
+                    if (deliveryDateMode === "same-day") {
+                      setDeliveryDate(event.target.value);
+                    }
+                  }}
+                />
+              </label>
+
+              <label className="modal-field">
+                <span>Transport Type</span>
+                <select
+                  value={transportType}
+                  onChange={(event) => setTransportType(event.target.value)}
+                >
+                  {transportTypeOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </label>
+
+              {transportType === "Other" ? (
+                <label className="modal-field">
+                  <span>Exact Transport Type</span>
+                  <input
+                    type="text"
+                    value={transportTypeOther}
+                    onChange={(event) => setTransportTypeOther(event.target.value)}
+                    placeholder="Enter exact transport type"
+                  />
+                </label>
+              ) : null}
+
+              <label className="modal-field">
+                <div className="modal-field-header">
+                  <span>Delivery Date</span>
+                  <div className="modal-shortcuts">
+                    <button
+                      type="button"
+                      className="modal-shortcut-button"
+                      onClick={() => {
+                        setDeliveryDateMode("same-day");
+                        setDeliveryDate(shipmentDate);
+                      }}
+                    >
+                      Same day
+                    </button>
+                    <button
+                      type="button"
+                      className="modal-shortcut-button"
+                      onClick={() => {
+                        setDeliveryDateMode("tbd");
+                        setDeliveryDate("");
+                      }}
+                    >
+                      TBD
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="date"
+                  value={deliveryDate}
+                  disabled={deliveryDateMode === "tbd"}
+                  onChange={(event) => {
+                    setDeliveryDateMode("date");
+                    setDeliveryDate(event.target.value);
+                  }}
+                />
+              </label>
+
+              <label className="modal-field">
+                <span>Notes</span>
+                <textarea
+                  value={shipmentNotes}
+                  onChange={(event) => setShipmentNotes(event.target.value)}
+                  placeholder="Add shipment notes"
+                  rows="4"
+                />
+              </label>
+            </div>
+
+            <div className="shipment-modal-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeShippingModal}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={markShipmentComplete}
+                disabled={!shippingDetailsComplete}
+              >
+                Save Shipped Status
               </button>
             </div>
           </div>
@@ -1588,9 +2719,9 @@ export default function App() {
                   value={newShipmentType}
                   onChange={(event) => setNewShipmentType(event.target.value)}
                 >
-                  <option value="Local">Local</option>
-                  <option value="National">National</option>
-                  <option value="International">International</option>
+                  {shipmentTypeOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
                 </select>
               </label>
               <label className="modal-field">
@@ -1621,7 +2752,12 @@ export default function App() {
               >
                 Cancel
               </button>
-              <button type="button" className="primary-button" onClick={createNewShipment}>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={createNewShipment}
+                disabled={!shipmentDetailsComplete}
+              >
                 Create Shipment
               </button>
             </div>
@@ -1657,8 +2793,21 @@ export default function App() {
               <div className="details-item"><span>Name</span><strong>{detailsItem.exactSupplyName}</strong></div>
               <div className="details-item"><span>Location Information</span><strong>{detailsItem.locationInfo}</strong></div>
               <div className="details-item"><span>Quantity</span><strong>{formatNumber(detailsItem.quantity)}</strong></div>
+              <div className="details-item"><span>Price per Unit</span><strong>{formatCurrency(detailsItem.unitPrice)}</strong></div>
+              <div className="details-item"><span>Total Price</span><strong>{formatCurrency(detailsItem.valuation)}</strong></div>
               <div className="details-item"><span>Expiration Date</span><strong>{detailsItem.expirationDate}</strong></div>
-              <div className="details-item full"><span>Image URL</span><strong>{detailsItem.imageUrl || "Not available"}</strong></div>
+              <div className="details-item">
+                <span>Image URL</span>
+                <strong>
+                  {detailsItem.imageUrl ? (
+                    <a href={detailsItem.imageUrl} target="_blank" rel="noreferrer">
+                      Open image link
+                    </a>
+                  ) : (
+                    "Not available"
+                  )}
+                </strong>
+              </div>
             </div>
 
             {detailsItem.imageUrl ? (
@@ -1666,6 +2815,303 @@ export default function App() {
                 <img className="details-image" src={detailsItem.imageUrl} alt={detailsItem.exactSupplyName} />
               </div>
             ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {returningShipmentItem ? (
+        <div className="modal-backdrop" role="presentation" onClick={closeReturnToInventoryModal}>
+          <div
+            className="shipment-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="return-to-inventory-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">Confirm Return</p>
+                <h2 id="return-to-inventory-modal-title">Move supply back to inventory?</h2>
+              </div>
+              <button type="button" className="modal-close" onClick={closeReturnToInventoryModal}>
+                x
+              </button>
+            </div>
+
+            <div className="shipment-modal-body">
+              <p className="modal-item-name">
+                Remove <strong>{returningShipmentItem.shipmentItem.exactSupplyName}</strong> from
+                this shipment and move it back to inventory?
+              </p>
+              <p className="shipment-empty">
+                This will remove the item from the shipment and change its status in Total
+                Inventory from pulled back to available.
+              </p>
+            </div>
+
+            <div className="shipment-modal-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeReturnToInventoryModal}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={returnShipmentItemToInventory}
+              >
+                Confirm Return
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {requestingShipmentItem ? (
+        <div className="modal-backdrop" role="presentation" onClick={closeRequestedUnitsModal}>
+          <div
+            className="shipment-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="requested-units-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">Requested Units</p>
+                <h2 id="requested-units-modal-title">Adjust requested units</h2>
+              </div>
+              <button type="button" className="modal-close" onClick={closeRequestedUnitsModal}>
+                x
+              </button>
+            </div>
+
+            <div className="shipment-modal-body">
+              <p className="modal-item-name">
+                Choose how many units are being requested for{" "}
+                <strong>{requestingShipmentItem.shipmentItem.exactSupplyName}</strong>.
+              </p>
+              <label className="modal-field">
+                <span>Requested Units</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={String(requestingShipmentItem.shipmentItem.quantity || 1)}
+                  value={requestedUnitsValue}
+                  onChange={(event) => setRequestedUnitsValue(event.target.value)}
+                />
+                <small>
+                  Maximum: {formatNumber(requestingShipmentItem.shipmentItem.quantity)} units
+                </small>
+              </label>
+            </div>
+
+            <div className="shipment-modal-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeRequestedUnitsModal}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={saveRequestedUnits}
+                disabled={
+                  !requestedUnitsValue ||
+                  Number(requestedUnitsValue) <= 0 ||
+                  Number(requestedUnitsValue) >
+                    Number(requestingShipmentItem.shipmentItem.quantity || 0)
+                }
+              >
+                Confirm Request
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {consolidatingShipmentItem ? (
+        <div className="modal-backdrop" role="presentation" onClick={closeConsolidationModal}>
+          <div
+            className="shipment-modal shipment-modal-large"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="consolidation-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">Consolidation Check</p>
+                <h2 id="consolidation-modal-title">
+                  Have exactly {formatNumber(consolidationRequestedQuantity)} units been
+                  consolidated?
+                </h2>
+                <p className="modal-helper-note">({consolidationRequestNote})</p>
+              </div>
+              <div className="binary-choice-group">
+                <button
+                  type="button"
+                  className={
+                    consolidationExactAnswer === true
+                      ? "binary-choice-button is-active"
+                      : "binary-choice-button"
+                  }
+                  onClick={() => {
+                    setConsolidationExactAnswer(true);
+                    setConsolidatedUnitsValue(String(consolidationRequestedQuantity));
+                    setConsolidationVarianceReasons([]);
+                  }}
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  className={
+                    consolidationExactAnswer === false
+                      ? "binary-choice-button is-active"
+                      : "binary-choice-button"
+                  }
+                  onClick={() => {
+                    setConsolidationExactAnswer(false);
+                    setConsolidatedUnitsValue(String(consolidationRequestedQuantity));
+                    setConsolidationVarianceReasons([]);
+                  }}
+                >
+                  No
+                </button>
+              </div>
+            </div>
+
+            <div className="shipment-modal-body">
+              {consolidationExactAnswer === false ? (
+                <>
+                  <label className="modal-field">
+                    <span>How many units were actually consolidated?</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={consolidatedUnitsValue}
+                      onChange={(event) => {
+                        const nextValue = event.target.value;
+                        const parsedValue = Number(nextValue);
+                        setConsolidatedUnitsValue(nextValue);
+                        setConsolidationVarianceReasons(
+                          Number.isFinite(parsedValue) && parsedValue > 0
+                            ? getAutomaticConsolidationReasons(
+                                consolidationRequestedQuantity,
+                                consolidationTotalQuantity,
+                                parsedValue
+                              )
+                            : []
+                        );
+                      }}
+                    />
+                  </label>
+
+                  {consolidationReasonOptions.length > 0 ? (
+                    <div className="status-option-list">
+                      {consolidationReasonOptions.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          className={
+                            consolidationVarianceReasons.includes(option)
+                              ? "status-option-button is-active"
+                              : "status-option-button"
+                          }
+                          onClick={() => setConsolidationVarianceReasons([option])}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  {automaticConsolidationReasons.length > 0 ? (
+                    <div className="status-option-list">
+                      {automaticConsolidationReasons.map((option) => (
+                        <div key={option} className="status-option-button is-active">
+                          {option}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+
+            <div className="shipment-modal-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeConsolidationModal}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={saveConsolidation}
+                disabled={consolidationConfirmDisabled}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {addingSupplyIdsShipmentId ? (
+        <div className="modal-backdrop" role="presentation" onClick={closeAddSupplyIdsModal}>
+          <div
+            className="shipment-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-supply-ids-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">Add Supplies</p>
+                <h2 id="add-supply-ids-modal-title">Add supplies via ID</h2>
+              </div>
+              <button type="button" className="modal-close" onClick={closeAddSupplyIdsModal}>
+                x
+              </button>
+            </div>
+
+            <div className="shipment-modal-body">
+              <label className="modal-field">
+                <span>Supply IDs</span>
+                <input
+                  type="text"
+                  value={shipmentSupplyIdsInput}
+                  onChange={(event) => setShipmentSupplyIdsInput(event.target.value)}
+                  placeholder="Paste supply IDs separated by commas"
+                />
+              </label>
+            </div>
+
+            <div className="shipment-modal-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeAddSupplyIdsModal}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={addSuppliesToShipmentById}
+                disabled={!shipmentSupplyIdsInput.trim()}
+              >
+                Add Supplies
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
