@@ -69,35 +69,14 @@ function normalizeShipmentItem(item) {
   };
 }
 
+function requestedShipmentItemValue(item) {
+  return (Number(item.unitPrice) || 0) * normalizeRequestedQuantity(item);
+}
+
 function buildDefaultConsolidationState(item) {
   return {
-    exactMatch: null,
     consolidatedQuantity: normalizeRequestedQuantity(item),
-    varianceReason: [],
   };
-}
-
-function normalizeVarianceReasons(value) {
-  if (Array.isArray(value)) {
-    return value.filter(Boolean);
-  }
-  if (typeof value === "string" && value.trim()) {
-    return [value.trim()];
-  }
-  return [];
-}
-
-function getAutomaticConsolidationReasons(requestedQuantity, totalQuantity, actualQuantity) {
-  if (actualQuantity <= requestedQuantity) {
-    return [];
-  }
-  if (requestedQuantity >= totalQuantity) {
-    return ["Found extra units"];
-  }
-  if (actualQuantity > totalQuantity) {
-    return ["Gave more than requested", "Found extra units"];
-  }
-  return ["Gave more than requested"];
 }
 
 function formatNumber(value) {
@@ -561,9 +540,6 @@ export default function App() {
   const [returningShipmentItem, setReturningShipmentItem] = useState(null);
   const [requestingShipmentItem, setRequestingShipmentItem] = useState(null);
   const [consolidatingShipmentItem, setConsolidatingShipmentItem] = useState(null);
-  const [consolidationExactAnswer, setConsolidationExactAnswer] = useState(null);
-  const [consolidatedUnitsValue, setConsolidatedUnitsValue] = useState("");
-  const [consolidationVarianceReasons, setConsolidationVarianceReasons] = useState([]);
   const [addingSupplyIdsShipmentId, setAddingSupplyIdsShipmentId] = useState(null);
   const [shipmentSupplyIdsInput, setShipmentSupplyIdsInput] = useState("");
   const [requestedUnitsValue, setRequestedUnitsValue] = useState("");
@@ -659,10 +635,24 @@ export default function App() {
     }
   }, [shipments]);
 
+  const currentShipmentRequestTotals = shipments
+    .filter((shipment) => !shipment.isCompleted)
+    .reduce((accumulator, shipment) => {
+      shipment.items.forEach((item) => {
+        const itemId = String(item.id);
+        accumulator[itemId] = (accumulator[itemId] || 0) + normalizeRequestedQuantity(item);
+      });
+      return accumulator;
+    }, {});
+
   const inventoryRows = buildInventoryRows(items);
   const inventoryRowsWithStatus = inventoryRows.map((row) => ({
     ...row,
     inventoryStatus: inventoryStatusForItem(row.id, shipments),
+    requestedQuantity: currentShipmentRequestTotals[String(row.id)] || 0,
+    isPartiallyRequested:
+      (currentShipmentRequestTotals[String(row.id)] || 0) > 0 &&
+      (currentShipmentRequestTotals[String(row.id)] || 0) < (row.quantity || 0),
   }));
   const unitPriceValues = inventoryRowsWithStatus.map((row) => row.unitPrice);
   const minUnitPrice = unitPriceValues.length > 0 ? Math.min(...unitPriceValues) : 0;
@@ -908,21 +898,11 @@ export default function App() {
   }
 
   function openConsolidationModal(shipmentId, shipmentItem) {
-    const requestedQuantity = normalizeRequestedQuantity(shipmentItem);
-    const existingDetails = shipmentItem.consolidationDetails || buildDefaultConsolidationState(shipmentItem);
     setConsolidatingShipmentItem({ shipmentId, shipmentItem });
-    setConsolidationExactAnswer(existingDetails.exactMatch);
-    setConsolidatedUnitsValue(
-      String(existingDetails.consolidatedQuantity || requestedQuantity || shipmentItem.quantity || 0)
-    );
-    setConsolidationVarianceReasons(normalizeVarianceReasons(existingDetails.varianceReason));
   }
 
   function closeConsolidationModal() {
     setConsolidatingShipmentItem(null);
-    setConsolidationExactAnswer(null);
-    setConsolidatedUnitsValue("");
-    setConsolidationVarianceReasons([]);
   }
 
   function openAddSupplyIdsModal(shipmentId) {
@@ -1072,92 +1052,29 @@ export default function App() {
     closeRequestedUnitsModal();
   }
 
-  async function saveConsolidation() {
-    if (!consolidatingShipmentItem || consolidationExactAnswer === null) {
+  function saveConsolidation() {
+    if (!consolidatingShipmentItem) {
       return;
     }
 
     const requestedQuantity = normalizeRequestedQuantity(consolidatingShipmentItem.shipmentItem);
-    const supplyId = String(consolidatingShipmentItem.shipmentItem.supplyId);
-    const parsedQuantity = Number(consolidatedUnitsValue);
-    const consolidatedQuantity =
-      consolidationExactAnswer === true ? requestedQuantity : parsedQuantity;
-
-    if (
-      !Number.isFinite(consolidatedQuantity) ||
-      consolidatedQuantity <= 0
-    ) {
-      return;
-    }
-
-    if (
-      consolidationExactAnswer === false &&
-      consolidatedQuantity !== requestedQuantity &&
-      consolidationDifference < 0 &&
-      effectiveConsolidationVarianceReasons.length === 0
-    ) {
-      return;
-    }
-
-    const nextVarianceReasons =
-      consolidatedQuantity === requestedQuantity
-        ? []
-        : effectiveConsolidationVarianceReasons;
-    const shouldSyncFoundExtra = nextVarianceReasons.includes("Found extra units");
-
-    try {
-      if (shouldSyncFoundExtra) {
-        const response = await fetch(`${API_BASE}/items/${encodeURIComponent(supplyId)}/quantity`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ quantity: consolidatedQuantity }),
-        });
-
-        if (!response.ok) {
-          const errorPayload = await response.json().catch(() => null);
-          throw new Error(errorPayload?.detail || "Unable to update Google Sheet quantity.");
-        }
-      }
-
-      setShipments((currentShipments) =>
-        currentShipments.map((shipment) => ({
-          ...shipment,
-          items: shipment.items.map((item) => {
-            if (String(item.id) !== String(consolidatingShipmentItem.shipmentItem.id)) {
-              return item;
-            }
-
-            const nextQuantity = shouldSyncFoundExtra ? consolidatedQuantity : item.quantity;
-            const nextRequestedQuantity =
-              shouldSyncFoundExtra && requestedQuantity >= consolidationTargetItem.quantity
-                ? consolidatedQuantity
-                : item.requestedQuantity;
-
-            return {
-              ...item,
-              quantity: nextQuantity,
-              requestedQuantity: nextRequestedQuantity,
-              valuation: (item.unitPrice || 0) * nextQuantity,
-              isConsolidated: true,
-              consolidationDetails: {
-                exactMatch: consolidationExactAnswer,
-                consolidatedQuantity,
-                varianceReason: nextVarianceReasons,
-              },
-            };
-          }),
-        }))
-      );
-
-      if (shouldSyncFoundExtra) {
-        await refreshDashboard();
-      }
-      closeConsolidationModal();
-    } catch (err) {
-      setError(err.message || "Unable to save consolidation details.");
-    }
+    setShipments((currentShipments) =>
+      currentShipments.map((shipment) => ({
+        ...shipment,
+        items: shipment.items.map((item) =>
+          String(item.id) === String(consolidatingShipmentItem.shipmentItem.id)
+            ? {
+                ...item,
+                isConsolidated: true,
+                consolidationDetails: {
+                  consolidatedQuantity: requestedQuantity,
+                },
+              }
+            : item
+        ),
+      }))
+    );
+    closeConsolidationModal();
   }
 
   function addSuppliesToShipmentById() {
@@ -1352,41 +1269,11 @@ export default function App() {
     ? normalizeRequestedQuantity(consolidationTargetItem)
     : 0;
   const consolidationTotalQuantity = Number(consolidationTargetItem?.quantity) || 0;
-  const parsedConsolidatedUnitsValue = Number(consolidatedUnitsValue);
-  const consolidationHasValidUnits =
-    Number.isFinite(parsedConsolidatedUnitsValue) &&
-    parsedConsolidatedUnitsValue > 0;
-  const consolidationDifference = consolidationHasValidUnits
-    ? parsedConsolidatedUnitsValue - consolidationRequestedQuantity
-    : 0;
   const consolidationRequestNote = consolidationTargetItem
     ? consolidationRequestedQuantity === consolidationTotalQuantity
       ? `Requested all ${formatNumber(consolidationTotalQuantity)} units`
       : `Requested ${formatNumber(consolidationRequestedQuantity)} of ${formatNumber(consolidationTotalQuantity)} units`
     : "";
-  const consolidationReasonOptions =
-    consolidationExactAnswer === false && consolidationHasValidUnits
-      ? consolidationDifference < 0
-        ? ["Found less units", "Gave less than requested"]
-        : []
-      : [];
-  const automaticConsolidationReasons =
-    consolidationExactAnswer === false && consolidationHasValidUnits
-      ? getAutomaticConsolidationReasons(
-          consolidationRequestedQuantity,
-          consolidationTotalQuantity,
-          parsedConsolidatedUnitsValue
-        )
-      : [];
-  const effectiveConsolidationVarianceReasons =
-    consolidationDifference > 0
-      ? automaticConsolidationReasons
-      : consolidationVarianceReasons;
-  const consolidationConfirmDisabled =
-    consolidationExactAnswer === null ||
-    (consolidationExactAnswer === false &&
-      (!consolidationHasValidUnits ||
-        (consolidationDifference < 0 && consolidationVarianceReasons.length === 0)));
   const shippingDetailsComplete =
     shipmentDate.trim() &&
     (transportType !== "Other" || transportTypeOther.trim()) &&
@@ -1790,7 +1677,12 @@ export default function App() {
                     {filteredInventoryRows.map((row) => (
                       <tr
                         key={row.id}
-                        className={row.needsReview ? "inventory-row-review" : undefined}
+                        className={[
+                          row.needsReview ? "inventory-row-review" : "",
+                          row.isPartiallyRequested ? "inventory-row-partial" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ") || undefined}
                       >
                         <td>
                           <input
@@ -2018,7 +1910,7 @@ export default function App() {
                     >
                       {(() => {
                         const shipmentValuation = shipment.items.reduce(
-                          (total, item) => total + (item.valuation || 0),
+                          (total, item) => total + requestedShipmentItemValue(item),
                           0
                         );
 
@@ -2307,7 +2199,7 @@ export default function App() {
                                 </div>
                                   <div className="shipment-line-pricing">
                                     <span>{formatCurrency(shipmentItem.unitPrice)} per unit</span>
-                                    <span>{formatCurrency(shipmentItem.valuation)} total</span>
+                                    <span>{formatCurrency(requestedShipmentItemValue(shipmentItem))} total</span>
                                   </div>
                                   <div className="shipment-expiration">
                                     <span>{shipmentItem.expirationDate}</span>
@@ -2364,7 +2256,7 @@ export default function App() {
                 <div className="shipment-list">
                   {pastShipments.map((shipment) => {
                     const shipmentValuation = shipment.items.reduce(
-                      (total, item) => total + (item.valuation || 0),
+                      (total, item) => total + requestedShipmentItemValue(item),
                       0
                     );
 
@@ -2937,7 +2829,7 @@ export default function App() {
       {consolidatingShipmentItem ? (
         <div className="modal-backdrop" role="presentation" onClick={closeConsolidationModal}>
           <div
-            className="shipment-modal shipment-modal-large"
+            className="shipment-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="consolidation-modal-title"
@@ -2952,95 +2844,17 @@ export default function App() {
                 </h2>
                 <p className="modal-helper-note">({consolidationRequestNote})</p>
               </div>
-              <div className="binary-choice-group">
-                <button
-                  type="button"
-                  className={
-                    consolidationExactAnswer === true
-                      ? "binary-choice-button is-active"
-                      : "binary-choice-button"
-                  }
-                  onClick={() => {
-                    setConsolidationExactAnswer(true);
-                    setConsolidatedUnitsValue(String(consolidationRequestedQuantity));
-                    setConsolidationVarianceReasons([]);
-                  }}
-                >
-                  Yes
-                </button>
-                <button
-                  type="button"
-                  className={
-                    consolidationExactAnswer === false
-                      ? "binary-choice-button is-active"
-                      : "binary-choice-button"
-                  }
-                  onClick={() => {
-                    setConsolidationExactAnswer(false);
-                    setConsolidatedUnitsValue(String(consolidationRequestedQuantity));
-                    setConsolidationVarianceReasons([]);
-                  }}
-                >
-                  No
-                </button>
-              </div>
+              <button type="button" className="modal-close" onClick={closeConsolidationModal}>
+                x
+              </button>
             </div>
 
             <div className="shipment-modal-body">
-              {consolidationExactAnswer === false ? (
-                <>
-                  <label className="modal-field">
-                    <span>How many units were actually consolidated?</span>
-                    <input
-                      type="number"
-                      min="1"
-                      value={consolidatedUnitsValue}
-                      onChange={(event) => {
-                        const nextValue = event.target.value;
-                        const parsedValue = Number(nextValue);
-                        setConsolidatedUnitsValue(nextValue);
-                        setConsolidationVarianceReasons(
-                          Number.isFinite(parsedValue) && parsedValue > 0
-                            ? getAutomaticConsolidationReasons(
-                                consolidationRequestedQuantity,
-                                consolidationTotalQuantity,
-                                parsedValue
-                              )
-                            : []
-                        );
-                      }}
-                    />
-                  </label>
-
-                  {consolidationReasonOptions.length > 0 ? (
-                    <div className="status-option-list">
-                      {consolidationReasonOptions.map((option) => (
-                        <button
-                          key={option}
-                          type="button"
-                          className={
-                            consolidationVarianceReasons.includes(option)
-                              ? "status-option-button is-active"
-                              : "status-option-button"
-                          }
-                          onClick={() => setConsolidationVarianceReasons([option])}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                  {automaticConsolidationReasons.length > 0 ? (
-                    <div className="status-option-list">
-                      {automaticConsolidationReasons.map((option) => (
-                        <div key={option} className="status-option-button is-active">
-                          {option}
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </>
-              ) : null}
+              <p className="modal-item-name">
+                Click confirm once the requested units for{" "}
+                <strong>{consolidatingShipmentItem.shipmentItem.exactSupplyName}</strong> have
+                been consolidated.
+              </p>
             </div>
 
             <div className="shipment-modal-actions">
@@ -3055,7 +2869,6 @@ export default function App() {
                 type="button"
                 className="primary-button"
                 onClick={saveConsolidation}
-                disabled={consolidationConfirmDisabled}
               >
                 Confirm
               </button>
