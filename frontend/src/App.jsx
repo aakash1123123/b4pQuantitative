@@ -1,7 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const API_BASE = "http://127.0.0.1:8000";
 const SHIPMENT_STORAGE_KEY = "blueprints-current-shipments";
+const PALLET_MAP_STORAGE_KEY = "blueprints-pallet-map-layout";
+const PALLET_MAP_DIMENSIONS = { width: 1520, height: 1120 };
+const PALLET_CARD_SIZE = { width: 198, height: 198 };
+const PALLET_MAP_GAP = 20;
 
 const tabs = [
   { id: "inventory", label: "Total Inventory" },
@@ -34,6 +38,24 @@ const transportTypeOptions = ["Car", "Boat", "Plane", "Other"];
 
 function normalizeShipmentType(value) {
   return value === "National" ? "International" : value || "Local";
+}
+
+function normalizePastShipmentStatus(value, deliveryDate = "") {
+  if (value === "Delivered") {
+    return "Delivered";
+  }
+  if (deliveryDate && deliveryDate !== "TBD") {
+    return "Delivered";
+  }
+  return "Shipped";
+}
+
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatShipmentHistoryDate(value) {
+  return value || "Not set";
 }
 
 function getShipmentStatus(shipment) {
@@ -69,8 +91,94 @@ function normalizeShipmentItem(item) {
   };
 }
 
+function withConsolidationCompletionDate(shipment) {
+  const anyConsolidated = shipment.items.some((item) => item.isConsolidated);
+  const allConsolidated =
+    shipment.items.length > 0 && shipment.items.every((item) => item.isConsolidated);
+
+  if (allConsolidated) {
+    return {
+      ...shipment,
+      consolidationStartedAt: shipment.consolidationStartedAt || todayIsoDate(),
+      consolidationCompletedAt: shipment.consolidationCompletedAt || todayIsoDate(),
+    };
+  }
+
+  return {
+    ...shipment,
+    consolidationStartedAt: anyConsolidated ? shipment.consolidationStartedAt || todayIsoDate() : "",
+    consolidationCompletedAt: shipment.consolidationCompletedAt || "",
+  };
+}
+
 function requestedShipmentItemValue(item) {
   return (Number(item.unitPrice) || 0) * normalizeRequestedQuantity(item);
+}
+
+function rankShipmentsBySearch(shipments, normalizedSearch) {
+  return [...shipments]
+    .map((shipment) => {
+      if (!normalizedSearch) {
+        return { shipment, score: 0 };
+      }
+
+      let score = 0;
+      const recipientName = (shipment.recipientName || "").toLowerCase();
+      if (recipientName.includes(normalizedSearch)) {
+        score += recipientName === normalizedSearch ? 10 : 6;
+      }
+
+      shipment.items.forEach((item) => {
+        const supplyId = String(item.supplyId || "").toLowerCase();
+        const exactSupplyName = (item.exactSupplyName || "").toLowerCase();
+        const generalSupply = (item.generalSupply || "").toLowerCase();
+        const manufacturer = (item.manufacturer || "").toLowerCase();
+
+        if (supplyId.includes(normalizedSearch)) {
+          score += supplyId === normalizedSearch ? 7 : 4;
+        }
+        if (exactSupplyName.includes(normalizedSearch)) {
+          score += exactSupplyName === normalizedSearch ? 5 : 3;
+        }
+        if (generalSupply.includes(normalizedSearch)) {
+          score += 2;
+        }
+        if (manufacturer.includes(normalizedSearch)) {
+          score += 2;
+        }
+      });
+
+      return { shipment, score };
+    })
+    .filter(({ score }) => !normalizedSearch || score > 0)
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+      return left.shipment.recipientName.localeCompare(right.shipment.recipientName);
+    })
+    .map(({ shipment }) => shipment);
+}
+
+function shipmentStatusDateValue(shipment, statusDateFilter) {
+  const fieldByFilter = {
+    creation: shipment.createdAt,
+    consolidation: shipment.consolidationCompletedAt,
+    ship: shipment.shippedAt,
+    delivery: shipment.deliveryDate,
+  };
+
+  const rawValue = fieldByFilter[statusDateFilter];
+  if (!rawValue || rawValue === "TBD") {
+    return 0;
+  }
+
+  const parsedValue = new Date(rawValue).getTime();
+  return Number.isFinite(parsedValue) ? parsedValue : 0;
+}
+
+function formatCurrentShipmentHistoryDate(value) {
+  return value || "Not started";
 }
 
 function buildDefaultConsolidationState(item) {
@@ -104,6 +212,24 @@ function daysUntil(dateValue) {
   const target = new Date(dateValue);
   target.setHours(0, 0, 0, 0);
   return Math.round((target - today) / 86400000);
+}
+
+function daysBetweenDates(targetDateValue, referenceDateValue) {
+  if (!targetDateValue || !referenceDateValue) {
+    return null;
+  }
+
+  const referenceDate = new Date(referenceDateValue);
+  const targetDate = new Date(targetDateValue);
+
+  if (Number.isNaN(referenceDate.getTime()) || Number.isNaN(targetDate.getTime())) {
+    return null;
+  }
+
+  referenceDate.setHours(0, 0, 0, 0);
+  targetDate.setHours(0, 0, 0, 0);
+
+  return Math.round((targetDate - referenceDate) / 86400000);
 }
 
 function expirationStatus(diff) {
@@ -274,7 +400,9 @@ function getShipmentItemsForDisplay(shipment) {
 }
 
 function inventoryStatusForItem(itemId, shipments) {
-  const isPulled = shipments.some((shipment) =>
+  const isPulled = shipments
+    .filter((shipment) => !shipment.isCompleted)
+    .some((shipment) =>
     shipment.items.some((shipmentItem) => String(shipmentItem.id) === String(itemId))
   );
 
@@ -326,11 +454,11 @@ const expirationBucketColors = {
 };
 
 const durationBucketColors = {
-  "0-30 days": "#dce9f8",
-  "31-90 days": "#a9c9ee",
-  "91-180 days": "#6fa2d9",
-  "181-365 days": "#356fae",
-  "365+ days": "#0d3b6f",
+  "0-30 days": "#f8f8f8",
+  "31-90 days": "#d7d7d7",
+  "91-180 days": "#9a9a9a",
+  "181-365 days": "#4e4e4e",
+  "365+ days": "#111111",
   "Unknown duration": "#d8dde6",
 };
 
@@ -356,6 +484,107 @@ const categoryPiePalette = [
   "#b6cad9",
   "#d2e0eb",
 ];
+
+const valueBucketOrder = ["$0-$50", "$50-$100", "$100-$200", "$200+"];
+const valueBucketColors = {
+  "$0-$50": "#dff5df",
+  "$50-$100": "#a8dda8",
+  "$100-$200": "#5baa5b",
+  "$200+": "#1f6f3c",
+};
+
+const supplyStatusOrder = ["Inventory", "Pulled", "Consolidated"];
+const supplyStatusColors = {
+  Inventory: "#b7c3d0",
+  Pulled: "#7aa9d8",
+  Consolidated: "#1f6f3c",
+};
+
+const boxCategoryPalette = [
+  "#0d3b6f",
+  "#2f7db6",
+  "#6aaed6",
+  "#8bc2df",
+  "#98b0c6",
+  "#4b6785",
+];
+
+function valueBucketForUnitPrice(unitPrice) {
+  const numericValue = Number(unitPrice) || 0;
+  if (numericValue < 50) {
+    return "$0-$50";
+  }
+  if (numericValue < 100) {
+    return "$50-$100";
+  }
+  if (numericValue < 200) {
+    return "$100-$200";
+  }
+  return "$200+";
+}
+
+function rectanglesOverlap(left, right) {
+  return !(
+    left.x + left.width <= right.x ||
+    right.x + right.width <= left.x ||
+    left.y + left.height <= right.y ||
+    right.y + right.height <= left.y
+  );
+}
+
+function clampPalletPosition(position) {
+  return {
+    x: Math.max(0, Math.min(position.x, PALLET_MAP_DIMENSIONS.width - PALLET_CARD_SIZE.width)),
+    y: Math.max(0, Math.min(position.y, PALLET_MAP_DIMENSIONS.height - PALLET_CARD_SIZE.height)),
+  };
+}
+
+function buildDefaultPalletLayout(palletIds) {
+  const columns = 5;
+  const layout = {};
+
+  palletIds.forEach((palletId, index) => {
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    layout[palletId] = {
+      x: column * (PALLET_CARD_SIZE.width + PALLET_MAP_GAP),
+      y: row * (PALLET_CARD_SIZE.height + PALLET_MAP_GAP),
+    };
+  });
+
+  return layout;
+}
+
+function mergePalletLayout(existingLayout, palletIds) {
+  const defaultLayout = buildDefaultPalletLayout(palletIds);
+  const nextLayout = {};
+
+  palletIds.forEach((palletId) => {
+    nextLayout[palletId] = clampPalletPosition(existingLayout?.[palletId] || defaultLayout[palletId]);
+  });
+
+  return nextLayout;
+}
+
+function canPlacePallet(layout, palletId, nextPosition) {
+  const candidateRect = {
+    ...nextPosition,
+    width: PALLET_CARD_SIZE.width,
+    height: PALLET_CARD_SIZE.height,
+  };
+
+  return Object.entries(layout).every(([otherPalletId, otherPosition]) => {
+    if (otherPalletId === palletId) {
+      return true;
+    }
+
+    return !rectanglesOverlap(candidateRect, {
+      ...otherPosition,
+      width: PALLET_CARD_SIZE.width,
+      height: PALLET_CARD_SIZE.height,
+    });
+  });
+}
 
 function buildPieChartBackground(segments) {
   if (!segments.length) {
@@ -406,6 +635,18 @@ function buildPieChartSegments(segments) {
     ].join(" ");
   }
 
+  function buildFullDonutPath() {
+    return [
+      `M ${center} ${center - outerRadius}`,
+      `A ${outerRadius} ${outerRadius} 0 1 1 ${center - 0.01} ${center - outerRadius}`,
+      `A ${outerRadius} ${outerRadius} 0 1 1 ${center} ${center - outerRadius}`,
+      `M ${center} ${center - innerRadius}`,
+      `A ${innerRadius} ${innerRadius} 0 1 0 ${center - 0.01} ${center - innerRadius}`,
+      `A ${innerRadius} ${innerRadius} 0 1 0 ${center} ${center - innerRadius}`,
+      "Z",
+    ].join(" ");
+  }
+
   let currentAngle = 0;
   return segments.map((segment) => {
     const startAngle = currentAngle;
@@ -418,16 +659,19 @@ function buildPieChartSegments(segments) {
       startAngle,
       endAngle: currentAngle,
       midAngle,
-      path: buildDonutSlicePath(startAngle, currentAngle),
+      path:
+        segments.length === 1 || Math.abs(sweep - 360) < 0.001
+          ? buildFullDonutPath()
+          : buildDonutSlicePath(startAngle, currentAngle),
     };
   });
 }
 
-function MetricCard({ label, value }) {
+function MetricCard({ label, value, className = "", valueClassName = "" }) {
   return (
-    <div className="metric-card">
+    <div className={className ? `metric-card ${className}` : "metric-card"}>
       <p className="metric-label">{label}</p>
-      <p className="metric-value">{value}</p>
+      <p className={valueClassName ? `metric-value ${valueClassName}` : "metric-value"}>{value}</p>
     </div>
   );
 }
@@ -442,6 +686,8 @@ function PieChartCard({
   activeLabel,
   onHover,
   cardClassName = "",
+  centerLabel = "raw items",
+  renderLegendDetail,
 }) {
   const normalizedActiveLabel = (activeLabel || "").trim().toLowerCase();
 
@@ -474,7 +720,7 @@ function PieChartCard({
             </svg>
             <div className="expiration-pie-center">
               <strong>{formatNumber(totalItems)}</strong>
-              <span>raw items</span>
+              <span>{centerLabel}</span>
             </div>
           </div>
         </div>
@@ -499,11 +745,409 @@ function PieChartCard({
               <div className="expiration-pie-copy">
                 <strong>{segment.label}</strong>
                 <span>
-                  {formatNumber(segment.value)} items • {segment.percentage}% of raw items
+                  {renderLegendDetail
+                    ? renderLegendDetail(segment)
+                    : `${formatNumber(segment.value)} items • ${segment.percentage}% of raw items`}
                 </span>
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShipmentDistributionChart({ shipmentItems }) {
+  const [activeLabel, setActiveLabel] = useState(null);
+
+  const chartData = buildFacetCounts(shipmentItems, "category")
+    .map((bucket, index) => {
+      const matchingItems = shipmentItems.filter((item) => item.category === bucket.value);
+      const rawItems = matchingItems.reduce(
+        (total, item) => total + normalizeRequestedQuantity(item),
+        0
+      );
+      const valuation = matchingItems.reduce(
+        (total, item) => total + requestedShipmentItemValue(item),
+        0
+      );
+
+      return {
+        label: bucket.value,
+        value: rawItems,
+        valuation,
+        color: categoryPiePalette[index % categoryPiePalette.length],
+      };
+    })
+    .filter((segment) => segment.value > 0)
+    .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label));
+
+  const totalItems = chartData.reduce((total, segment) => total + segment.value, 0);
+  const legendSegments = chartData.map((segment) => ({
+    ...segment,
+    total: totalItems,
+    percentage: percentOfTotal(segment.value, totalItems),
+  }));
+  const pieSegments = buildPieChartSegments(legendSegments);
+  const activeSegment =
+    legendSegments.find((segment) => segment.label === activeLabel) || legendSegments[0] || null;
+
+  if (!legendSegments.length) {
+    return (
+      <div className="shipment-distribution-card">
+        <span className="shipment-status-label">Supply Distribution</span>
+        <p className="shipment-distribution-empty">No supply distribution yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="shipment-distribution-card">
+      <span className="shipment-status-label">Supply Distribution</span>
+      <div
+        className="shipment-distribution-chart"
+        role="img"
+        aria-label="Pie chart of shipment supply distribution by category"
+        onMouseLeave={() => setActiveLabel(null)}
+      >
+        <div
+          className="shipment-distribution-pie"
+          style={{ background: buildPieChartBackground(legendSegments) }}
+        >
+          <svg className="pie-slice-layer" viewBox="0 0 200 200" aria-hidden="true">
+            {pieSegments.map((segment) => (
+              <path
+                key={segment.label}
+                d={segment.path}
+                className={
+                  (activeLabel || activeSegment?.label) === segment.label
+                    ? "pie-slice-hotspot active"
+                    : "pie-slice-hotspot"
+                }
+                onPointerEnter={() => setActiveLabel(segment.label)}
+                onPointerMove={() => setActiveLabel(segment.label)}
+              />
+            ))}
+          </svg>
+          <div className="shipment-distribution-center">
+            <strong>{formatNumber(totalItems)}</strong>
+            <span>items</span>
+          </div>
+        </div>
+      </div>
+      {activeSegment ? (
+        <div className="shipment-distribution-tooltip">
+          <strong>{activeSegment.label}</strong>
+          <span>{formatNumber(activeSegment.value)} raw item supplies</span>
+          <span>{activeSegment.percentage}% of total supplies</span>
+          <span>{formatCurrency(activeSegment.valuation)} valuation</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CompactPalletPieChart({ title, ariaLabel, segments, tooltipFormatter }) {
+  const [activeLabel, setActiveLabel] = useState(null);
+  const pieSegments = buildPieChartSegments(segments.filter((segment) => segment.value > 0));
+  const activeSegment =
+    segments.find((segment) => segment.label === activeLabel) || null;
+
+  return (
+    <div className="pallet-mini-chart-card">
+      <span className="pallet-mini-chart-title">{title}</span>
+      <div
+        className="pallet-mini-chart-wrap"
+        role="img"
+        aria-label={ariaLabel}
+        onMouseLeave={() => setActiveLabel(null)}
+      >
+        <div
+          className="pallet-mini-chart"
+          style={{ background: buildPieChartBackground(segments.filter((segment) => segment.value > 0)) }}
+        >
+          <svg className="pie-slice-layer" viewBox="0 0 200 200" aria-hidden="true">
+            {pieSegments.map((segment) => (
+              <path
+                key={segment.label}
+                d={segment.path}
+                className={activeLabel === segment.label ? "pie-slice-hotspot active" : "pie-slice-hotspot"}
+                onPointerEnter={() => setActiveLabel(segment.label)}
+                onPointerMove={() => setActiveLabel(segment.label)}
+              />
+            ))}
+          </svg>
+        </div>
+        {activeSegment ? (
+          <div className="pallet-mini-tooltip">
+            {tooltipFormatter(activeSegment).map((line) => (
+              <span key={line}>{line}</span>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function shipmentChartAxisMax(values) {
+  const highestValue = Math.max(...values, 0);
+  return Math.max(5, Math.ceil(highestValue / 5) * 5);
+}
+
+function ShipmentBarChart({ data, variant = "primary" }) {
+  const axisMax = shipmentChartAxisMax(data.map((entry) => entry.count));
+  const ticks = Array.from({ length: 6 }, (_, index) => {
+    const value = Math.round(((5 - index) / 5) * axisMax);
+    return value;
+  });
+  const plotHeight = 220;
+
+  return (
+    <div className="shipment-bar-chart">
+      <div className="shipment-bar-chart-y-axis">
+        {ticks.map((tickValue) => (
+          <span key={tickValue}>{formatNumber(tickValue)}</span>
+        ))}
+      </div>
+      <div className="shipment-bar-chart-plot">
+        <div className="shipment-bar-chart-grid" aria-hidden="true">
+          {ticks.map((tickValue) => (
+            <span key={`grid-${tickValue}`} />
+          ))}
+        </div>
+        <div className="shipment-bar-chart-bars">
+          {data.map((entry) => {
+            const rawHeight = axisMax > 0 ? (entry.count / axisMax) * plotHeight : 0;
+            const height = entry.count > 0 ? Math.max(0, rawHeight - 0.5) : 0;
+
+            return (
+              <div className="shipment-bar-chart-column" key={entry.label}>
+                <div className="shipment-bar-chart-bar-wrap">
+                  <span
+                    className="shipment-bar-chart-count"
+                    style={{ bottom: `${height + 6}px` }}
+                  >
+                    {formatNumber(entry.count)}
+                  </span>
+                  {entry.count > 0 ? (
+                    <div
+                      className={
+                        variant === "secondary"
+                          ? "shipment-bar-chart-bar shipment-bar-chart-bar-secondary"
+                          : "shipment-bar-chart-bar"
+                      }
+                      style={{ height: `${height}px` }}
+                    />
+                  ) : null}
+                </div>
+                <strong className="shipment-bar-chart-label">{entry.label}</strong>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatCompactCurrency(value) {
+  if (value >= 1000000) {
+    return `$${(value / 1000000).toFixed(value >= 10000000 ? 0 : 1)}M`;
+  }
+  if (value >= 1000) {
+    return `$${Math.round(value / 1000)}K`;
+  }
+  return `$${Math.round(value)}`;
+}
+
+function shipmentValueAxisMax(values) {
+  const highestValue = Math.max(...values, 0);
+  return Math.max(100000, Math.ceil(highestValue / 100000) * 100000);
+}
+
+function ShipmentValueLineChart({ points, xAxisEndLabel, onSelectShipment }) {
+  const plotWidth = 560;
+  const plotHeight = 240;
+  const axisMax = shipmentValueAxisMax(points.map((point) => point.cumulativeValue));
+  const yTicks = Array.from({ length: 5 }, (_, index) => ((4 - index) / 4) * axisMax);
+  const [activePointKey, setActivePointKey] = useState(null);
+  const coordinates = points.map((point) => ({
+    ...point,
+    x: (point.dayOffset / point.totalDays) * plotWidth,
+    y: plotHeight - (point.cumulativeValue / axisMax) * plotHeight,
+  }));
+  const activePoint =
+    coordinates.find((point) => `${point.shipmentId}-${point.dayOffset}` === activePointKey) || null;
+  const linePath = coordinates
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
+    .join(" ");
+
+  return (
+    <div className="shipment-line-chart">
+      <div className="shipment-line-chart-y-axis">
+        {yTicks.map((tick) => (
+          <span key={tick}>{formatCompactCurrency(tick)}</span>
+        ))}
+      </div>
+      <div className="shipment-line-chart-plot" onMouseLeave={() => setActivePointKey(null)}>
+        <div className="shipment-line-chart-grid" aria-hidden="true">
+          {yTicks.map((tick) => (
+            <span key={`line-${tick}`} />
+          ))}
+        </div>
+        <svg
+          className="shipment-line-chart-svg"
+          viewBox={`0 0 ${plotWidth} ${plotHeight}`}
+          preserveAspectRatio="none"
+          aria-label="Shipment value by year line chart"
+          role="img"
+        >
+          {coordinates.length > 1 ? (
+            <path className="shipment-line-chart-path" d={linePath} />
+          ) : null}
+          {coordinates.map((point) => (
+            <g key={`${point.shipmentId}-${point.dayOffset}`}>
+              <circle
+                className="shipment-line-chart-dot-hitbox"
+                cx={point.x}
+                cy={point.y}
+                r="14"
+                onMouseEnter={() => setActivePointKey(`${point.shipmentId}-${point.dayOffset}`)}
+                onMouseMove={() => setActivePointKey(`${point.shipmentId}-${point.dayOffset}`)}
+              />
+              <circle
+                className="shipment-line-chart-dot"
+                cx={point.x}
+                cy={point.y}
+                r="4"
+              />
+            </g>
+          ))}
+        </svg>
+        {activePoint ? (
+          <div
+            className="shipment-line-chart-tooltip"
+            style={{
+              left: `${(activePoint.x / plotWidth) * 100}%`,
+              top: `${activePoint.y}px`,
+            }}
+            onMouseEnter={() =>
+              setActivePointKey(`${activePoint.shipmentId}-${activePoint.dayOffset}`)
+            }
+          >
+            <button
+              type="button"
+              className="shipment-line-chart-link"
+              onClick={() => onSelectShipment(activePoint.shipmentId, activePoint.label)}
+            >
+              {activePoint.label}
+            </button>
+            <span>{activePoint.shipmentDateLabel}</span>
+            <span>{formatCurrency(activePoint.shipmentValue)} added</span>
+            <span>{formatCurrency(activePoint.cumulativeValue)} running total</span>
+          </div>
+        ) : null}
+        <div className="shipment-line-chart-x-axis">
+          <span>Jan 1</span>
+          <span>{xAxisEndLabel}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function shipmentItemsAxisMax(values) {
+  const highestValue = Math.max(...values, 0);
+  return Math.max(100, Math.ceil(highestValue / 100) * 100);
+}
+
+function ShipmentItemsLineChart({ points, xAxisEndLabel, onSelectShipment }) {
+  const plotWidth = 560;
+  const plotHeight = 240;
+  const axisMax = shipmentItemsAxisMax(points.map((point) => point.cumulativeItems));
+  const yTicks = Array.from({ length: 5 }, (_, index) => ((4 - index) / 4) * axisMax);
+  const [activePointKey, setActivePointKey] = useState(null);
+  const coordinates = points.map((point) => ({
+    ...point,
+    x: (point.dayOffset / point.totalDays) * plotWidth,
+    y: plotHeight - (point.cumulativeItems / axisMax) * plotHeight,
+  }));
+  const activePoint =
+    coordinates.find((point) => `${point.shipmentId}-${point.dayOffset}` === activePointKey) || null;
+  const linePath = coordinates
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
+    .join(" ");
+
+  return (
+    <div className="shipment-line-chart">
+      <div className="shipment-line-chart-y-axis">
+        {yTicks.map((tick) => (
+          <span key={tick}>{formatNumber(tick)}</span>
+        ))}
+      </div>
+      <div className="shipment-line-chart-plot" onMouseLeave={() => setActivePointKey(null)}>
+        <div className="shipment-line-chart-grid" aria-hidden="true">
+          {yTicks.map((tick) => (
+            <span key={`line-${tick}`} />
+          ))}
+        </div>
+        <svg
+          className="shipment-line-chart-svg"
+          viewBox={`0 0 ${plotWidth} ${plotHeight}`}
+          preserveAspectRatio="none"
+          aria-label="Total items shipped this year line chart"
+          role="img"
+        >
+          {coordinates.length > 1 ? (
+            <path className="shipment-line-chart-path shipment-line-chart-path-secondary" d={linePath} />
+          ) : null}
+          {coordinates.map((point) => (
+            <g key={`${point.shipmentId}-${point.dayOffset}`}>
+              <circle
+                className="shipment-line-chart-dot-hitbox"
+                cx={point.x}
+                cy={point.y}
+                r="14"
+                onMouseEnter={() => setActivePointKey(`${point.shipmentId}-${point.dayOffset}`)}
+                onMouseMove={() => setActivePointKey(`${point.shipmentId}-${point.dayOffset}`)}
+              />
+              <circle
+                className="shipment-line-chart-dot shipment-line-chart-dot-secondary"
+                cx={point.x}
+                cy={point.y}
+                r="4"
+              />
+            </g>
+          ))}
+        </svg>
+        {activePoint ? (
+          <div
+            className="shipment-line-chart-tooltip"
+            style={{
+              left: `${(activePoint.x / plotWidth) * 100}%`,
+              top: `${activePoint.y}px`,
+            }}
+            onMouseEnter={() =>
+              setActivePointKey(`${activePoint.shipmentId}-${activePoint.dayOffset}`)
+            }
+          >
+            <button
+              type="button"
+              className="shipment-line-chart-link"
+              onClick={() => onSelectShipment(activePoint.shipmentId, activePoint.label)}
+            >
+              {activePoint.label}
+            </button>
+            <span>{activePoint.shipmentDateLabel}</span>
+            <span>{formatNumber(activePoint.shipmentItems)} items added</span>
+            <span>{formatNumber(activePoint.cumulativeItems)} items running total</span>
+          </div>
+        ) : null}
+        <div className="shipment-line-chart-x-axis">
+          <span>Jan 1</span>
+          <span>{xAxisEndLabel}</span>
         </div>
       </div>
     </div>
@@ -535,6 +1179,10 @@ export default function App() {
   const [selectedInventoryIds, setSelectedInventoryIds] = useState([]);
   const [valuationRange, setValuationRange] = useState({ min: 0, max: 0 });
   const [shipmentSearchTerm, setShipmentSearchTerm] = useState("");
+  const [currentShipmentTypeFilter, setCurrentShipmentTypeFilter] = useState("All");
+  const [currentShipmentStatusFilter, setCurrentShipmentStatusFilter] = useState("All");
+  const [pastShipmentTypeFilter, setPastShipmentTypeFilter] = useState("All");
+  const [pastShipmentStatusDateFilter, setPastShipmentStatusDateFilter] = useState("creation");
   const [isCreateShipmentModalOpen, setIsCreateShipmentModalOpen] = useState(false);
   const [detailsItem, setDetailsItem] = useState(null);
   const [returningShipmentItem, setReturningShipmentItem] = useState(null);
@@ -546,7 +1194,10 @@ export default function App() {
   const [expandedShipmentIds, setExpandedShipmentIds] = useState([]);
   const [editingShipmentField, setEditingShipmentField] = useState(null);
   const [editingShipmentValue, setEditingShipmentValue] = useState("");
+  const [editingShipmentNotesId, setEditingShipmentNotesId] = useState(null);
+  const [editingShipmentNotesValue, setEditingShipmentNotesValue] = useState("");
   const [shippingShipmentId, setShippingShipmentId] = useState(null);
+  const [deliveringShipmentId, setDeliveringShipmentId] = useState(null);
   const [shipmentDate, setShipmentDate] = useState("");
   const [transportType, setTransportType] = useState("Car");
   const [transportTypeOther, setTransportTypeOther] = useState("");
@@ -556,6 +1207,16 @@ export default function App() {
   const [activeExpirationPieLabel, setActiveExpirationPieLabel] = useState(null);
   const [activeDurationPieLabel, setActiveDurationPieLabel] = useState(null);
   const [activeCategoryPieLabel, setActiveCategoryPieLabel] = useState(null);
+  const [activeValuePieLabel, setActiveValuePieLabel] = useState(null);
+  const [activeBoxCategoryPieLabel, setActiveBoxCategoryPieLabel] = useState(null);
+  const [activeSupplyStatusPieLabel, setActiveSupplyStatusPieLabel] = useState(null);
+  const [isEditingPalletMap, setIsEditingPalletMap] = useState(false);
+  const [savedPalletLayout, setSavedPalletLayout] = useState({});
+  const [draftPalletLayout, setDraftPalletLayout] = useState({});
+  const [draggingPallet, setDraggingPallet] = useState(null);
+  const [activePalletId, setActivePalletId] = useState(null);
+  const [focusedPastShipmentId, setFocusedPastShipmentId] = useState(null);
+  const palletMapRef = useRef(null);
 
   async function refreshDashboard(showLoader = false) {
     try {
@@ -610,16 +1271,24 @@ export default function App() {
       if (storedShipments) {
         const parsedShipments = JSON.parse(storedShipments);
         const normalizedShipments = (parsedShipments.length > 0 ? parsedShipments : defaultShipments)
-          .map((shipment) => ({
-            ...shipment,
-            shipmentType: normalizeShipmentType(shipment.shipmentType),
-            filterMode:
-              !shipment.filterMode || shipment.filterMode === "location"
-                ? "original"
-                : shipment.filterMode,
-            isCompleted: Boolean(shipment.isCompleted),
-            items: (shipment.items || []).map(normalizeShipmentItem),
-          }));
+          .map((shipment) =>
+            withConsolidationCompletionDate({
+              ...shipment,
+              shipmentType: normalizeShipmentType(shipment.shipmentType),
+              filterMode:
+                !shipment.filterMode || shipment.filterMode === "location"
+                  ? "original"
+                  : shipment.filterMode,
+              isCompleted: Boolean(shipment.isCompleted),
+              createdAt: shipment.createdAt || "",
+              consolidationStartedAt: shipment.consolidationStartedAt || "",
+              consolidationCompletedAt: shipment.consolidationCompletedAt || "",
+              pastShipmentStatus: Boolean(shipment.isCompleted)
+                ? normalizePastShipmentStatus(shipment.pastShipmentStatus, shipment.deliveryDate)
+                : undefined,
+              items: (shipment.items || []).map(normalizeShipmentItem),
+            })
+          );
         setShipments(normalizedShipments);
       }
     } catch (err) {
@@ -635,6 +1304,19 @@ export default function App() {
     }
   }, [shipments]);
 
+  useEffect(() => {
+    try {
+      const storedLayout = window.localStorage.getItem(PALLET_MAP_STORAGE_KEY);
+      if (storedLayout) {
+        setSavedPalletLayout(JSON.parse(storedLayout));
+      }
+    } catch (err) {
+      console.error("Unable to restore pallet layout", err);
+    }
+  }, []);
+
+  const currentShipments = shipments.filter((shipment) => !shipment.isCompleted);
+  const pastShipments = shipments.filter((shipment) => shipment.isCompleted);
   const currentShipmentRequestTotals = shipments
     .filter((shipment) => !shipment.isCompleted)
     .reduce((accumulator, shipment) => {
@@ -645,7 +1327,15 @@ export default function App() {
       return accumulator;
     }, {});
 
-  const inventoryRows = buildInventoryRows(items);
+  const completedShipmentItemIds = new Set(
+    shipments
+      .filter((shipment) => shipment.isCompleted)
+      .flatMap((shipment) => shipment.items.map((item) => String(item.id)))
+  );
+
+  const inventoryRows = buildInventoryRows(items).filter(
+    (row) => !completedShipmentItemIds.has(String(row.id))
+  );
   const inventoryRowsWithStatus = inventoryRows.map((row) => ({
     ...row,
     inventoryStatus: inventoryStatusForItem(row.id, shipments),
@@ -654,6 +1344,70 @@ export default function App() {
       (currentShipmentRequestTotals[String(row.id)] || 0) > 0 &&
       (currentShipmentRequestTotals[String(row.id)] || 0) < (row.quantity || 0),
   }));
+  const inventoryRowsWithShipmentStatus = inventoryRowsWithStatus.map((row) => {
+    const matchingShipmentItems = currentShipments.flatMap((shipment) =>
+      shipment.items.filter((shipmentItem) => String(shipmentItem.id) === String(row.id))
+    );
+
+    return {
+      ...row,
+      supplyWorkflowStatus:
+        matchingShipmentItems.length === 0
+          ? "Inventory"
+        : matchingShipmentItems.some((shipmentItem) => shipmentItem.isConsolidated)
+            ? "Consolidated"
+            : "Pulled",
+    };
+  });
+  const allBoxTypes = [...new Set(inventoryRowsWithStatus.map((row) => row.boxType).filter(Boolean))].sort(
+    (left, right) => left.localeCompare(right)
+  );
+  const palletSummaries = Object.values(
+    inventoryRowsWithShipmentStatus
+      .filter((row) => row.palletNumber && row.palletNumber !== "Unassigned")
+      .reduce((accumulator, row) => {
+        const palletId = String(row.palletNumber);
+
+        if (!accumulator[palletId]) {
+          accumulator[palletId] = {
+            id: palletId,
+            label: `Pallet ${palletId}`,
+            rows: [],
+            totalSupplies: 0,
+            boxKeys: new Set(),
+            boxTypeCounts: {},
+          };
+        }
+
+        accumulator[palletId].rows.push(row);
+        accumulator[palletId].totalSupplies += Number(row.quantity) || 0;
+        accumulator[palletId].boxKeys.add(`${row.boxType}|${row.boxNumber}`);
+
+        const boxKey = `${row.boxType}|${row.boxNumber}`;
+        if (!accumulator[palletId].seenBoxKeys) {
+          accumulator[palletId].seenBoxKeys = new Set();
+        }
+        if (!accumulator[palletId].seenBoxKeys.has(boxKey)) {
+          accumulator[palletId].seenBoxKeys.add(boxKey);
+          accumulator[palletId].boxTypeCounts[row.boxType] =
+            (accumulator[palletId].boxTypeCounts[row.boxType] || 0) + 1;
+        }
+
+        return accumulator;
+      }, {})
+  )
+    .map((summary) => ({
+      ...summary,
+      boxBreakdown: allBoxTypes.map((boxType) => ({
+        boxType,
+        count: summary.boxTypeCounts[boxType] || 0,
+      })),
+      totalBoxes: summary.boxKeys.size,
+    }))
+    .sort((left, right) => Number(left.id) - Number(right.id));
+  const palletIdKey = palletSummaries.map((summary) => summary.id).join("|");
+  const activePalletSummary =
+    palletSummaries.find((summary) => summary.id === activePalletId) || null;
   const unitPriceValues = inventoryRowsWithStatus.map((row) => row.unitPrice);
   const minUnitPrice = unitPriceValues.length > 0 ? Math.min(...unitPriceValues) : 0;
   const maxUnitPrice = unitPriceValues.length > 0 ? Math.max(...unitPriceValues) : 0;
@@ -690,8 +1444,124 @@ export default function App() {
     setValuationRange({ min: minUnitPrice, max: maxUnitPrice });
   }, [minUnitPrice, maxUnitPrice]);
 
+  useEffect(() => {
+    const nextLayout = mergePalletLayout(savedPalletLayout, palletSummaries.map((summary) => summary.id));
+    if (JSON.stringify(nextLayout) !== JSON.stringify(savedPalletLayout)) {
+      setSavedPalletLayout(nextLayout);
+    }
+
+    if (isEditingPalletMap) {
+      const nextDraftLayout = mergePalletLayout(
+        draftPalletLayout,
+        palletSummaries.map((summary) => summary.id)
+      );
+      if (JSON.stringify(nextDraftLayout) !== JSON.stringify(draftPalletLayout)) {
+        setDraftPalletLayout(nextDraftLayout);
+      }
+    }
+  }, [palletIdKey, savedPalletLayout, draftPalletLayout, isEditingPalletMap]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(PALLET_MAP_STORAGE_KEY, JSON.stringify(savedPalletLayout));
+    } catch (err) {
+      console.error("Unable to persist pallet layout", err);
+    }
+  }, [savedPalletLayout]);
+
+  useEffect(() => {
+    if (
+      !focusedPastShipmentId ||
+      activeTab !== "shipments" ||
+      activeShipmentSubtab !== "past"
+    ) {
+      return;
+    }
+
+    const target = document.getElementById(`past-shipment-${focusedPastShipmentId}`);
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      setFocusedPastShipmentId(null);
+    }
+  }, [focusedPastShipmentId, activeTab, activeShipmentSubtab, shipments]);
+
+  useEffect(() => {
+    if (!draggingPallet || !isEditingPalletMap) {
+      return undefined;
+    }
+
+    function handlePointerMove(event) {
+      const canvasBounds = palletMapRef.current?.getBoundingClientRect();
+      if (!canvasBounds) {
+        return;
+      }
+
+      const unclampedPosition = {
+        x: event.clientX - canvasBounds.left - draggingPallet.offsetX,
+        y: event.clientY - canvasBounds.top - draggingPallet.offsetY,
+      };
+      const nextPosition = clampPalletPosition(unclampedPosition);
+
+      setDraftPalletLayout((currentLayout) =>
+        canPlacePallet(currentLayout, draggingPallet.palletId, nextPosition)
+          ? { ...currentLayout, [draggingPallet.palletId]: nextPosition }
+          : currentLayout
+      );
+    }
+
+    function handlePointerUp() {
+      setDraggingPallet(null);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [draggingPallet, isEditingPalletMap]);
+
+  const visiblePalletLayout = isEditingPalletMap ? draftPalletLayout : savedPalletLayout;
+
   function matchesSelectedFilter(selectedValues, rowValue) {
     return selectedValues.length === 0 || selectedValues.includes(rowValue);
+  }
+
+  function startEditingPalletConformation() {
+    setDraftPalletLayout(mergePalletLayout(savedPalletLayout, palletSummaries.map((summary) => summary.id)));
+    setIsEditingPalletMap(true);
+  }
+
+  function savePalletConformation() {
+    setSavedPalletLayout(mergePalletLayout(draftPalletLayout, palletSummaries.map((summary) => summary.id)));
+    setIsEditingPalletMap(false);
+    setDraggingPallet(null);
+  }
+
+  function handlePalletPointerDown(event, palletId) {
+    if (!isEditingPalletMap) {
+      return;
+    }
+
+    const canvasBounds = palletMapRef.current?.getBoundingClientRect();
+    const palletPosition = visiblePalletLayout[palletId];
+    if (!canvasBounds || !palletPosition) {
+      return;
+    }
+
+    setDraggingPallet({
+      palletId,
+      offsetX: event.clientX - canvasBounds.left - palletPosition.x,
+      offsetY: event.clientY - canvasBounds.top - palletPosition.y,
+    });
+  }
+
+  function jumpToPastShipment(shipmentId, shipmentName) {
+    setActiveTab("shipments");
+    setActiveShipmentSubtab("past");
+    setShipmentSearchTerm(shipmentName || "");
+    setFocusedPastShipmentId(shipmentId);
   }
 
   function toggleFilter(setter, currentValues, value) {
@@ -762,6 +1632,9 @@ export default function App() {
       shipmentType: normalizeShipmentType(shipmentType),
       pointOfContact,
       filterMode: "original",
+      createdAt: todayIsoDate(),
+      consolidationStartedAt: "",
+      consolidationCompletedAt: "",
       items,
     };
   }
@@ -1059,20 +1932,26 @@ export default function App() {
 
     const requestedQuantity = normalizeRequestedQuantity(consolidatingShipmentItem.shipmentItem);
     setShipments((currentShipments) =>
-      currentShipments.map((shipment) => ({
-        ...shipment,
-        items: shipment.items.map((item) =>
-          String(item.id) === String(consolidatingShipmentItem.shipmentItem.id)
-            ? {
-                ...item,
-                isConsolidated: true,
-                consolidationDetails: {
-                  consolidatedQuantity: requestedQuantity,
-                },
-              }
-            : item
-        ),
-      }))
+      currentShipments.map((shipment) => {
+        if (shipment.id !== consolidatingShipmentItem.shipmentId) {
+          return shipment;
+        }
+
+        return withConsolidationCompletionDate({
+          ...shipment,
+          items: shipment.items.map((item) =>
+            String(item.id) === String(consolidatingShipmentItem.shipmentItem.id)
+              ? {
+                  ...item,
+                  isConsolidated: true,
+                  consolidationDetails: {
+                    consolidatedQuantity: requestedQuantity,
+                  },
+                }
+              : item
+          ),
+        });
+      })
     );
     closeConsolidationModal();
   }
@@ -1112,7 +1991,7 @@ export default function App() {
           return shipment;
         }
 
-        return {
+        return withConsolidationCompletionDate({
           ...shipment,
           items: shipment.items.map((item) => ({
             ...item,
@@ -1123,7 +2002,7 @@ export default function App() {
               varianceReason: "",
             },
           })),
-        };
+        });
       })
     );
   }
@@ -1154,6 +2033,7 @@ export default function App() {
               shippedAt: resolvedShipmentDate,
               transportType: resolvedTransportType,
               deliveryDate: resolvedDeliveryDate,
+              pastShipmentStatus: normalizePastShipmentStatus(undefined, resolvedDeliveryDate),
               shipmentNotes: shipmentNotes.trim(),
             }
           : shipment
@@ -1168,6 +2048,79 @@ export default function App() {
         ? currentIds.filter((currentId) => currentId !== shipmentId)
         : [...currentIds, shipmentId]
     );
+  }
+
+  function updatePastShipmentStatus(shipmentId, nextStatus) {
+    if (nextStatus === "Delivered") {
+      const targetShipment = shipments.find((shipment) => shipment.id === shipmentId);
+      setDeliveringShipmentId(shipmentId);
+      setDeliveryDate(
+        targetShipment?.deliveryDate && targetShipment.deliveryDate !== "TBD"
+          ? targetShipment.deliveryDate
+          : ""
+      );
+      setShipmentNotes(targetShipment?.shipmentNotes || "");
+      return;
+    }
+
+    setShipments((currentShipments) =>
+      currentShipments.map((shipment) =>
+        shipment.id === shipmentId
+          ? { ...shipment, pastShipmentStatus: nextStatus }
+          : shipment
+      )
+    );
+  }
+
+  function closeDeliveredModal() {
+    setDeliveringShipmentId(null);
+    setDeliveryDate("");
+    setShipmentNotes("");
+  }
+
+  function startEditingShipmentNotes(shipmentId, currentNotes) {
+    setEditingShipmentNotesId(shipmentId);
+    setEditingShipmentNotesValue(currentNotes || "");
+  }
+
+  function cancelEditingShipmentNotes() {
+    setEditingShipmentNotesId(null);
+    setEditingShipmentNotesValue("");
+  }
+
+  function saveEditingShipmentNotes() {
+    if (!editingShipmentNotesId) {
+      return;
+    }
+
+    setShipments((currentShipments) =>
+      currentShipments.map((shipment) =>
+        shipment.id === editingShipmentNotesId
+          ? { ...shipment, shipmentNotes: editingShipmentNotesValue.trim() }
+          : shipment
+      )
+    );
+    cancelEditingShipmentNotes();
+  }
+
+  function saveDeliveredStatus() {
+    if (!deliveringShipmentId || !deliveryDate.trim()) {
+      return;
+    }
+
+    setShipments((currentShipments) =>
+      currentShipments.map((shipment) =>
+        shipment.id === deliveringShipmentId
+          ? {
+              ...shipment,
+              deliveryDate: deliveryDate.trim(),
+              shipmentNotes: shipmentNotes.trim(),
+              pastShipmentStatus: "Delivered",
+            }
+          : shipment
+      )
+    );
+    closeDeliveredModal();
   }
 
   const filteredInventoryRows = inventoryRowsWithStatus.filter((row) => {
@@ -1196,8 +2149,6 @@ export default function App() {
     filteredInventoryRows.length > 0 &&
     filteredInventoryRows.every((row) => selectedInventoryIds.includes(row.id));
   const normalizedShipmentSearch = shipmentSearchTerm.trim().toLowerCase();
-  const currentShipments = shipments.filter((shipment) => !shipment.isCompleted);
-  const pastShipments = shipments.filter((shipment) => shipment.isCompleted);
   const currentShipmentRequestMap = currentShipments.reduce((accumulator, shipment) => {
     shipment.items.forEach((item) => {
       const supplyId = String(item.supplyId || item.id || "");
@@ -1218,48 +2169,29 @@ export default function App() {
 
     return accumulator;
   }, {});
-  const rankedShipments = [...currentShipments]
-    .map((shipment) => {
-      if (!normalizedShipmentSearch) {
-        return { shipment, score: 0 };
-      }
+  const rankedShipments = rankShipmentsBySearch(currentShipments, normalizedShipmentSearch);
+  const filteredCurrentShipments = rankedShipments.filter((shipment) => {
+    const matchesType =
+      currentShipmentTypeFilter === "All" ||
+      normalizeShipmentType(shipment.shipmentType) === currentShipmentTypeFilter;
+    const matchesStatus =
+      currentShipmentStatusFilter === "All" ||
+      getShipmentStatus(shipment) === currentShipmentStatusFilter;
 
-      let score = 0;
-      const recipientName = shipment.recipientName.toLowerCase();
-      if (recipientName.includes(normalizedShipmentSearch)) {
-        score += recipientName === normalizedShipmentSearch ? 10 : 6;
-      }
-
-      shipment.items.forEach((item) => {
-        const supplyId = String(item.supplyId || "").toLowerCase();
-        const exactSupplyName = item.exactSupplyName.toLowerCase();
-        const generalSupply = item.generalSupply.toLowerCase();
-        const manufacturer = item.manufacturer.toLowerCase();
-
-        if (supplyId.includes(normalizedShipmentSearch)) {
-          score += supplyId === normalizedShipmentSearch ? 7 : 4;
-        }
-        if (exactSupplyName.includes(normalizedShipmentSearch)) {
-          score += exactSupplyName === normalizedShipmentSearch ? 5 : 3;
-        }
-        if (generalSupply.includes(normalizedShipmentSearch)) {
-          score += 2;
-        }
-        if (manufacturer.includes(normalizedShipmentSearch)) {
-          score += 2;
-        }
-      });
-
-      return { shipment, score };
-    })
-    .filter(({ shipment, score }) => !normalizedShipmentSearch || score > 0)
-    .sort((left, right) => {
-      if (right.score !== left.score) {
-        return right.score - left.score;
-      }
-      return left.shipment.recipientName.localeCompare(right.shipment.recipientName);
-    })
-    .map(({ shipment }) => shipment);
+    return matchesType && matchesStatus;
+  });
+  const rankedPastShipments = rankShipmentsBySearch(pastShipments, normalizedShipmentSearch);
+  const filteredPastShipments = rankedPastShipments
+    .filter((shipment) =>
+      pastShipmentTypeFilter === "All"
+        ? true
+        : normalizeShipmentType(shipment.shipmentType) === pastShipmentTypeFilter
+    )
+    .sort(
+      (left, right) =>
+        shipmentStatusDateValue(right, pastShipmentStatusDateFilter) -
+        shipmentStatusDateValue(left, pastShipmentStatusDateFilter)
+    );
   const shipmentDetailsComplete =
     newShipmentRecipientName.trim() &&
     newShipmentType &&
@@ -1354,12 +2286,271 @@ export default function App() {
   const categoryPieSegments = buildPieChartSegments(
     categoryChartLegendData.filter((segment) => segment.value > 0)
   );
-  const uniqueSupplyTypes = new Set(
-    inventoryRowsWithStatus.map((row) => row.generalSupply).filter(Boolean)
-  ).size;
-  const uniqueExactSupplies = new Set(
-    inventoryRowsWithStatus.map((row) => row.exactSupplyName).filter(Boolean)
-  ).size;
+  const valueBucketChartData = valueBucketOrder.map((bucketLabel) => {
+    const matchingRows = inventoryRowsWithShipmentStatus.filter(
+      (row) => valueBucketForUnitPrice(row.unitPrice) === bucketLabel
+    );
+    const rawItems = matchingRows.reduce((total, row) => total + (row.quantity || 0), 0);
+
+    return {
+      label: bucketLabel,
+      value: rawItems,
+      color: valueBucketColors[bucketLabel],
+    };
+  });
+  const totalValueBucketItems = valueBucketChartData.reduce(
+    (total, segment) => total + segment.value,
+    0
+  );
+  const valueBucketLegendData = valueBucketChartData.map((segment) => ({
+    ...segment,
+    total: totalValueBucketItems,
+    percentage: percentOfTotal(segment.value, totalValueBucketItems),
+  }));
+  const valueBucketPieBackground = buildPieChartBackground(
+    valueBucketLegendData.filter((segment) => segment.value > 0)
+  );
+  const valueBucketPieSegments = buildPieChartSegments(
+    valueBucketLegendData.filter((segment) => segment.value > 0)
+  );
+  const boxCategoryChartData = buildFacetCounts(inventoryRowsWithShipmentStatus, "boxType")
+    .map((bucket, index) => {
+      const matchingRows = inventoryRowsWithShipmentStatus.filter((row) => row.boxType === bucket.value);
+      const uniqueBoxes = new Set(
+        matchingRows.map((row) => `${row.palletNumber}|${row.boxType}|${row.boxNumber}`)
+      );
+      const rawItems = matchingRows.reduce((total, row) => total + (row.quantity || 0), 0);
+
+      return {
+        label: bucket.value,
+        value: rawItems,
+        boxCount: uniqueBoxes.size,
+        color: boxCategoryPalette[index % boxCategoryPalette.length],
+      };
+    });
+  const totalBoxCategoryItems = boxCategoryChartData.reduce(
+    (total, segment) => total + segment.value,
+    0
+  );
+  const boxCategoryLegendData = boxCategoryChartData.map((segment) => ({
+    ...segment,
+    total: totalBoxCategoryItems,
+    percentage: percentOfTotal(segment.value, totalBoxCategoryItems),
+  }));
+  const boxCategoryPieBackground = buildPieChartBackground(
+    boxCategoryLegendData.filter((segment) => segment.value > 0)
+  );
+  const boxCategoryPieSegments = buildPieChartSegments(
+    boxCategoryLegendData.filter((segment) => segment.value > 0)
+  );
+  const supplyStatusChartData = supplyStatusOrder.map((statusLabel) => {
+    const matchingRows = inventoryRowsWithShipmentStatus.filter(
+      (row) => row.supplyWorkflowStatus === statusLabel
+    );
+    const rawItems = matchingRows.reduce((total, row) => total + (row.quantity || 0), 0);
+
+    return {
+      label: statusLabel,
+      value: rawItems,
+      color: supplyStatusColors[statusLabel],
+    };
+  });
+  const totalSupplyStatusItems = supplyStatusChartData.reduce(
+    (total, segment) => total + segment.value,
+    0
+  );
+  const supplyStatusLegendData = supplyStatusChartData.map((segment) => ({
+    ...segment,
+    total: totalSupplyStatusItems,
+    percentage: percentOfTotal(segment.value, totalSupplyStatusItems),
+  }));
+  const supplyStatusPieBackground = buildPieChartBackground(
+    supplyStatusLegendData.filter((segment) => segment.value > 0)
+  );
+  const supplyStatusPieSegments = buildPieChartSegments(
+    supplyStatusLegendData.filter((segment) => segment.value > 0)
+  );
+  const activePalletRows = activePalletSummary?.rows || [];
+  const activePalletTotalSupplies = activePalletRows.reduce(
+    (total, row) => total + (row.quantity || 0),
+    0
+  );
+  const activePalletTotalBoxes = activePalletSummary?.totalBoxes || 0;
+  const activePalletTotalValue = activePalletRows.reduce(
+    (total, row) => total + (row.valuation || 0),
+    0
+  );
+  const activePalletExpiredSupplies = activePalletRows
+    .filter((row) => row.expirationDaysLeft !== null && row.expirationDaysLeft <= 0)
+    .reduce((total, row) => total + (row.quantity || 0), 0);
+  const activePalletExpiringSoonSupplies = activePalletRows
+    .filter(
+      (row) =>
+        row.expirationDaysLeft !== null &&
+        row.expirationDaysLeft > 0 &&
+        row.expirationDaysLeft <= 90
+    )
+    .reduce((total, row) => total + (row.quantity || 0), 0);
+  const palletExpirationLegendData = buildFacetCounts(activePalletRows, "expirationFilter", [
+    "Already expired",
+    "0-90 days",
+    "90-180 days",
+    "180-365 days",
+    "365+ days",
+    "No expiration date",
+  ])
+    .map((bucket) => {
+      const matchingRows = activePalletRows.filter((row) => row.expirationFilter === bucket.value);
+      const rawItems = matchingRows.reduce((total, row) => total + (row.quantity || 0), 0);
+
+      return {
+        label: bucket.value,
+        value: rawItems,
+        total: activePalletTotalSupplies,
+        percentage: percentOfTotal(rawItems, activePalletTotalSupplies),
+        color: expirationBucketColors[bucket.value] || "#4a90e2",
+      };
+    })
+    .filter((segment) => segment.value > 0);
+  const palletDurationLegendData = durationBucketOrder
+    .map((bucketLabel) => {
+      const matchingRows = activePalletRows.filter((row) => row.durationFilter === bucketLabel);
+      const rawItems = matchingRows.reduce((total, row) => total + (row.quantity || 0), 0);
+
+      return {
+        label: bucketLabel,
+        value: rawItems,
+        total: activePalletTotalSupplies,
+        percentage: percentOfTotal(rawItems, activePalletTotalSupplies),
+        color: durationBucketColors[bucketLabel] || "#4a90e2",
+      };
+    })
+    .filter((segment) => segment.value > 0);
+  const palletCategoryLegendData = buildFacetCounts(activePalletRows, "category")
+    .map((bucket, index) => {
+      const matchingRows = activePalletRows.filter((row) => row.category === bucket.value);
+      const rawItems = matchingRows.reduce((total, row) => total + (row.quantity || 0), 0);
+
+      return {
+        label: bucket.value,
+        value: rawItems,
+        total: activePalletTotalSupplies,
+        percentage: percentOfTotal(rawItems, activePalletTotalSupplies),
+        color: categoryPiePalette[index % categoryPiePalette.length],
+      };
+    })
+    .filter((segment) => segment.value > 0);
+  const palletValueLegendData = valueBucketOrder
+    .map((bucketLabel) => {
+      const matchingRows = activePalletRows.filter(
+        (row) => valueBucketForUnitPrice(row.unitPrice) === bucketLabel
+      );
+      const rawItems = matchingRows.reduce((total, row) => total + (row.quantity || 0), 0);
+
+      return {
+        label: bucketLabel,
+        value: rawItems,
+        total: activePalletTotalSupplies,
+        percentage: percentOfTotal(rawItems, activePalletTotalSupplies),
+        color: valueBucketColors[bucketLabel],
+      };
+    })
+    .filter((segment) => segment.value > 0);
+  const palletBoxLegendData = buildFacetCounts(activePalletRows, "boxType")
+    .map((bucket, index) => {
+      const matchingRows = activePalletRows.filter((row) => row.boxType === bucket.value);
+      const uniqueBoxes = new Set(
+        matchingRows.map((row) => `${row.boxType}|${row.boxNumber}`)
+      );
+      const rawItems = matchingRows.reduce((total, row) => total + (row.quantity || 0), 0);
+
+      return {
+        label: bucket.value,
+        value: rawItems,
+        total: activePalletTotalSupplies,
+        percentage: percentOfTotal(rawItems, activePalletTotalSupplies),
+        boxCount: uniqueBoxes.size,
+        color: boxCategoryPalette[index % boxCategoryPalette.length],
+      };
+    })
+    .filter((segment) => segment.value > 0);
+  const palletSupplyStatusLegendData = supplyStatusOrder
+    .map((statusLabel) => {
+      const matchingRows = activePalletRows.filter((row) => row.supplyWorkflowStatus === statusLabel);
+      const rawItems = matchingRows.reduce((total, row) => total + (row.quantity || 0), 0);
+
+      return {
+        label: statusLabel,
+        value: rawItems,
+        total: activePalletTotalSupplies,
+        percentage: percentOfTotal(rawItems, activePalletTotalSupplies),
+        color: supplyStatusColors[statusLabel],
+      };
+    })
+    .filter((segment) => segment.value > 0);
+  const palletDetailCharts = [
+    {
+      title: "Expiration Summary",
+      ariaLabel: "Pallet expiration breakdown",
+      segments: palletExpirationLegendData,
+      tooltipFormatter: (segment) => [
+        segment.label,
+        `${formatNumber(segment.value)} supplies`,
+        `${segment.percentage}% of pallet supplies`,
+      ],
+    },
+    {
+      title: "Duration Summary",
+      ariaLabel: "Pallet duration breakdown",
+      segments: palletDurationLegendData,
+      tooltipFormatter: (segment) => [
+        segment.label,
+        `${formatNumber(segment.value)} supplies`,
+        `${segment.percentage}% of pallet supplies`,
+      ],
+    },
+    {
+      title: "Category Summary",
+      ariaLabel: "Pallet category breakdown",
+      segments: palletCategoryLegendData,
+      tooltipFormatter: (segment) => [
+        segment.label,
+        `${formatNumber(segment.value)} supplies`,
+        `${segment.percentage}% of pallet supplies`,
+      ],
+    },
+    {
+      title: "Value Summary",
+      ariaLabel: "Pallet value bucket breakdown",
+      segments: palletValueLegendData,
+      tooltipFormatter: (segment) => [
+        segment.label,
+        `${formatNumber(segment.value)} supplies`,
+        `${segment.percentage}% of pallet supplies`,
+      ],
+    },
+    {
+      title: "Box Category",
+      ariaLabel: "Pallet box category breakdown",
+      segments: palletBoxLegendData,
+      tooltipFormatter: (segment) => [
+        segment.label,
+        `${formatNumber(segment.value)} supplies`,
+        `${segment.percentage}% of pallet supplies`,
+        `${formatNumber(segment.boxCount)} boxes`,
+      ],
+    },
+    {
+      title: "Supply Status",
+      ariaLabel: "Pallet supply status breakdown",
+      segments: palletSupplyStatusLegendData,
+      tooltipFormatter: (segment) => [
+        segment.label,
+        `${formatNumber(segment.value)} supplies`,
+        `${segment.percentage}% of pallet supplies`,
+      ],
+    },
+  ];
   const uniqueCategories = new Set(
     inventoryRowsWithStatus.map((row) => row.category).filter(Boolean)
   ).size;
@@ -1369,49 +2560,176 @@ export default function App() {
   const expiringSoonInventoryUnits = inventoryRowsWithStatus
     .filter((row) => row.expirationDaysLeft !== null && row.expirationDaysLeft > 0 && row.expirationDaysLeft <= 90)
     .reduce((total, row) => total + (row.quantity || 0), 0);
-  const noExpirationInventoryUnits = inventoryRowsWithStatus
-    .filter((row) => row.expirationDaysLeft === null)
-    .reduce((total, row) => total + (row.quantity || 0), 0);
   const slowMovingInventoryUnits = inventoryRowsWithStatus
     .filter((row) => row.daysInWarehouse > 180)
     .reduce((total, row) => total + (row.quantity || 0), 0);
-  const shipmentsWithItems = shipments.filter((shipment) => shipment.items.length > 0);
-  const totalShipmentUnits = shipments.reduce(
+  const assignedSupplyUnits = inventoryRowsWithShipmentStatus
+    .filter((row) => row.supplyWorkflowStatus === "Pulled" || row.supplyWorkflowStatus === "Consolidated")
+    .reduce((total, row) => total + (row.quantity || 0), 0);
+  const averageBoxesPerPallet =
+    (kpis?.pallet_count ?? 0) > 0 ? (kpis.box_count ?? 0) / kpis.pallet_count : 0;
+  const totalShippedUnits = pastShipments.reduce(
     (total, shipment) =>
       total +
-      shipment.items.reduce((shipmentTotal, item) => shipmentTotal + (item.quantity || 0), 0),
+      shipment.items.reduce(
+        (shipmentTotal, item) => shipmentTotal + normalizeRequestedQuantity(item),
+        0
+      ),
     0
   );
-  const totalShipmentLines = shipments.reduce((total, shipment) => total + shipment.items.length, 0);
+  const totalShippedValuation = pastShipments.reduce(
+    (total, shipment) =>
+      total + shipment.items.reduce((shipmentTotal, item) => shipmentTotal + requestedShipmentItemValue(item), 0),
+    0
+  );
   const uniqueShipmentRecipients = new Set(
     shipments.map((shipment) => shipment.recipientName).filter(Boolean)
   ).size;
-  const averageUnitsPerShipment = average(
-    shipmentsWithItems.map((shipment) =>
-      shipment.items.reduce((shipmentTotal, item) => shipmentTotal + (item.quantity || 0), 0)
+  const recurringShipmentCount = shipments.reduce((total, shipment, _, allShipments) => {
+    if (!shipment.recipientName) {
+      return total;
+    }
+
+    const normalizedRecipientName = shipment.recipientName.trim().toLowerCase();
+    const matchingRecipientCount = allShipments.filter(
+      (candidate) => candidate.recipientName?.trim().toLowerCase() === normalizedRecipientName
+    ).length;
+
+    return total + (matchingRecipientCount > 1 ? 1 : 0);
+  }, 0);
+  const averageShipmentValuation = average(
+    pastShipments.map((shipment) =>
+      shipment.items.reduce((shipmentTotal, item) => shipmentTotal + requestedShipmentItemValue(item), 0)
+    )
+  );
+  const averageUnitsPerShippedShipment = average(
+    pastShipments.map((shipment) =>
+      shipment.items.reduce(
+        (shipmentTotal, item) => shipmentTotal + normalizeRequestedQuantity(item),
+        0
+      )
     )
   );
   const shipmentsByType = shipmentTypeOptions.map((type) => ({
     type,
     count: shipments.filter((shipment) => normalizeShipmentType(shipment.shipmentType) === type).length,
   }));
-  const maxShipmentTypeCount = shipmentsByType.reduce(
-    (highest, shipmentType) => Math.max(highest, shipmentType.count),
-    0
-  );
-  const nearExpiryShipmentUnits = shipments.reduce(
+  const shipmentStatusCounts = [
+    {
+      label: "Planning",
+      count: shipments.filter(
+        (shipment) => !shipment.isCompleted && getShipmentStatus(shipment) === "Planning"
+      ).length,
+    },
+    {
+      label: "Consolidating",
+      count: shipments.filter(
+        (shipment) => !shipment.isCompleted && getShipmentStatus(shipment) === "Consolidating"
+      ).length,
+    },
+    {
+      label: "Consolidation Complete",
+      count: shipments.filter(
+        (shipment) =>
+          !shipment.isCompleted && getShipmentStatus(shipment) === "Consolidation Complete"
+      ).length,
+    },
+    {
+      label: "Shipped",
+      count: shipments.filter(
+        (shipment) =>
+          shipment.isCompleted &&
+          normalizePastShipmentStatus(shipment.pastShipmentStatus, shipment.deliveryDate) === "Shipped"
+      ).length,
+    },
+    {
+      label: "Delivered",
+      count: shipments.filter(
+        (shipment) =>
+          shipment.isCompleted &&
+          normalizePastShipmentStatus(shipment.pastShipmentStatus, shipment.deliveryDate) === "Delivered"
+      ).length,
+    },
+  ];
+  const nearExpiryShipmentUnits = pastShipments.reduce(
     (total, shipment) =>
       total +
       shipment.items
         .filter(
-          (item) => item.expirationDaysLeft !== null && item.expirationDaysLeft > 0 && item.expirationDaysLeft <= 90
+          (item) => {
+            const daysUntilExpirationAtShipment = daysBetweenDates(
+              item.expirationDate,
+              shipment.shippedAt
+            );
+
+            return (
+              daysUntilExpirationAtShipment !== null &&
+              daysUntilExpirationAtShipment <= 90
+            );
+          }
         )
-        .reduce((shipmentTotal, item) => shipmentTotal + (item.quantity || 0), 0),
+        .reduce(
+          (shipmentTotal, item) => shipmentTotal + normalizeRequestedQuantity(item),
+          0
+        ),
     0
   );
-  const shippedCategoryCount = new Set(
-    shipments.flatMap((shipment) => shipment.items.map((item) => item.category)).filter(Boolean)
-  ).size;
+  const shipmentValueWindowStart = new Date(new Date().getFullYear(), 0, 1);
+  shipmentValueWindowStart.setHours(0, 0, 0, 0);
+  const shipmentValueWindowEnd = new Date(new Date().getFullYear(), 11, 31);
+  shipmentValueWindowEnd.setHours(0, 0, 0, 0);
+  const shipmentValueWindowDays = Math.max(
+    1,
+    Math.round((shipmentValueWindowEnd - shipmentValueWindowStart) / 86400000)
+  );
+  const shipmentValueByYearPoints = pastShipments
+    .filter((shipment) => shipment.shippedAt)
+    .map((shipment) => {
+      const shippedDate = new Date(shipment.shippedAt);
+      shippedDate.setHours(0, 0, 0, 0);
+      return {
+        shipment,
+        shippedDate,
+        shipmentValue: shipment.items.reduce(
+          (total, item) => total + requestedShipmentItemValue(item),
+          0
+        ),
+        shipmentItems: shipment.items.reduce(
+          (total, item) => total + normalizeRequestedQuantity(item),
+          0
+        ),
+      };
+    })
+    .filter(
+      ({ shippedDate }) =>
+        shippedDate >= shipmentValueWindowStart && shippedDate <= shipmentValueWindowEnd
+    )
+    .sort((left, right) => left.shippedDate - right.shippedDate)
+    .reduce((accumulator, entry) => {
+      const previousTotal = accumulator.length > 0 ? accumulator[accumulator.length - 1].cumulativeValue : 0;
+      accumulator.push({
+        shipmentId: entry.shipment.id,
+        label: entry.shipment.recipientName || "Shipment",
+        shipmentDateLabel: entry.shipment.shippedAt,
+        shipmentValue: entry.shipmentValue,
+        shipmentItems: entry.shipmentItems,
+        cumulativeValue: previousTotal + entry.shipmentValue,
+        dayOffset: Math.max(
+          0,
+          Math.round((entry.shippedDate - shipmentValueWindowStart) / 86400000)
+        ),
+        totalDays: shipmentValueWindowDays,
+      });
+      return accumulator;
+    }, []);
+  const shipmentItemsByYearPoints = shipmentValueByYearPoints.reduce((accumulator, point) => {
+    const previousTotal = accumulator.length > 0 ? accumulator[accumulator.length - 1].cumulativeItems : 0;
+    accumulator.push({
+      ...point,
+      cumulativeItems: previousTotal + point.shipmentItems,
+    });
+    return accumulator;
+  }, []);
 
   return (
     <main className="page-shell">
@@ -1756,24 +3074,27 @@ export default function App() {
 
           <div className="metrics-grid">
             <MetricCard label="Total Units On Hand" value={formatNumber(kpis.total_raw_items)} />
-            <MetricCard label="Distinct Supply Types" value={formatNumber(uniqueSupplyTypes)} />
-            <MetricCard label="Distinct Line Items" value={formatNumber(uniqueExactSupplies)} />
-            <MetricCard label="Supply Categories" value={formatNumber(uniqueCategories)} />
             <MetricCard label="Expired Units" value={formatNumber(expiredInventoryUnits)} />
             <MetricCard label="Expiring In 90 Days" value={formatNumber(expiringSoonInventoryUnits)} />
+            <MetricCard label="Slow-Moving Units" value={formatNumber(slowMovingInventoryUnits)} />
+            <MetricCard label="Assigned Units" value={formatNumber(assignedSupplyUnits)} />
+            <MetricCard label="Pallet Count" value={formatNumber(kpis.pallet_count)} />
+            <MetricCard label="Box Count" value={formatNumber(kpis.box_count)} />
+            <MetricCard label="Avg Boxes per Pallet" value={averageBoxesPerPallet.toFixed(1)} />
             <MetricCard
               label="Average Duration (Days)"
               value={(kpis.avg_duration_per_item ?? 0).toFixed(1)}
             />
-            <MetricCard label="Slow-Moving Units" value={formatNumber(slowMovingInventoryUnits)} />
-            <MetricCard label="No Expiration Recorded" value={formatNumber(noExpirationInventoryUnits)} />
-            <MetricCard label="Pallet Count" value={formatNumber(kpis.pallet_count)} />
-            <MetricCard label="Box Count" value={formatNumber(kpis.box_count)} />
-            <MetricCard label="Estimated Inventory Value" value={formatCurrency(kpis.total_value)} />
+            <MetricCard
+              label="Estimated Inventory Value"
+              value={formatCurrency(kpis.total_value)}
+              className="metric-card-wide"
+              valueClassName="metric-value-compact"
+            />
           </div>
 
           <div className="kpi-analytics-grid">
-            <div className="summary-card">
+            <div className="summary-card kpi-card-half">
               <div className="panel-header">
                 <div>
                   <p className="section-label">Expiration Summary</p>
@@ -1797,7 +3118,7 @@ export default function App() {
               )}
             </div>
 
-            <div className="summary-card">
+            <div className="summary-card kpi-card-half">
               <div className="panel-header">
                 <div>
                   <p className="section-label">Duration Summary</p>
@@ -1846,6 +3167,158 @@ export default function App() {
                 <p>No category data is available yet.</p>
               )}
             </div>
+
+            <div className="summary-card kpi-card-third">
+              <div className="panel-header">
+                <div>
+                  <p className="section-label">Value Summary</p>
+                  <h3>Inventory by unit price bucket</h3>
+                </div>
+              </div>
+
+              {valueBucketLegendData.length > 0 ? (
+                <PieChartCard
+                  title="Supplies by price per unit"
+                  ariaLabel="Pie chart of inventory by price per unit bucket"
+                  totalItems={totalValueBucketItems}
+                  segments={valueBucketPieSegments}
+                  legendSegments={valueBucketLegendData}
+                  background={valueBucketPieBackground}
+                  activeLabel={activeValuePieLabel}
+                  onHover={setActiveValuePieLabel}
+                  cardClassName="kpi-compact-card"
+                />
+              ) : (
+                <p>No value data is available yet.</p>
+              )}
+            </div>
+
+            <div className="summary-card kpi-card-third">
+              <div className="panel-header">
+                <div>
+                  <p className="section-label">Box Category</p>
+                  <h3>Inventory by box category</h3>
+                </div>
+              </div>
+
+              {boxCategoryLegendData.length > 0 ? (
+                <PieChartCard
+                  title="Supplies by box category"
+                  ariaLabel="Pie chart of inventory by box category"
+                  totalItems={totalBoxCategoryItems}
+                  segments={boxCategoryPieSegments}
+                  legendSegments={boxCategoryLegendData}
+                  background={boxCategoryPieBackground}
+                  activeLabel={activeBoxCategoryPieLabel}
+                  onHover={setActiveBoxCategoryPieLabel}
+                  cardClassName="kpi-compact-card"
+                  renderLegendDetail={(segment) =>
+                    `${formatNumber(segment.value)} items • ${segment.percentage}% of raw items • ${formatNumber(segment.boxCount)} boxes`
+                  }
+                />
+              ) : (
+                <p>No box category data is available yet.</p>
+              )}
+            </div>
+
+            <div className="summary-card kpi-card-third">
+              <div className="panel-header">
+                <div>
+                  <p className="section-label">Supply Status</p>
+                  <h3>Inventory by workflow status</h3>
+                </div>
+              </div>
+
+              {supplyStatusLegendData.length > 0 ? (
+                <PieChartCard
+                  title="Supplies by current status"
+                  ariaLabel="Pie chart of inventory by current supply status"
+                  totalItems={totalSupplyStatusItems}
+                  segments={supplyStatusPieSegments}
+                  legendSegments={supplyStatusLegendData}
+                  background={supplyStatusPieBackground}
+                  activeLabel={activeSupplyStatusPieLabel}
+                  onHover={setActiveSupplyStatusPieLabel}
+                  cardClassName="kpi-compact-card"
+                />
+              ) : (
+                <p>No supply status data is available yet.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="summary-card pallet-map-card">
+            <div className="panel-header">
+              <div>
+                <p className="section-label">Pallet Map</p>
+                <h3>Warehouse pallet layout</h3>
+              </div>
+              <div className="pallet-map-actions">
+                {!isEditingPalletMap ? (
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={startEditingPalletConformation}
+                  >
+                    Edit Pallet Conformation
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={savePalletConformation}
+                  >
+                    Save Conformation
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="pallet-map-scroll">
+              <div
+                ref={palletMapRef}
+                className={isEditingPalletMap ? "pallet-map-canvas is-editing" : "pallet-map-canvas"}
+              >
+                {palletSummaries.map((summary) => {
+                  const position = visiblePalletLayout[summary.id] || { x: 0, y: 0 };
+
+                  return (
+                    <div
+                      key={summary.id}
+                      className={isEditingPalletMap ? "pallet-card is-editing" : "pallet-card"}
+                      style={{ left: position.x, top: position.y }}
+                      onPointerDown={(event) => handlePalletPointerDown(event, summary.id)}
+                    >
+                      <div className="pallet-card-header">
+                        <strong>{summary.label}</strong>
+                        <button
+                          type="button"
+                          className="info-icon-button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setActivePalletId(summary.id);
+                          }}
+                          aria-label={`Open pallet details for ${summary.label}`}
+                        >
+                          ⓘ
+                        </button>
+                      </div>
+                      <div className="pallet-card-copy">
+                        <span>{formatNumber(summary.totalSupplies)} supplies</span>
+                        <span>{formatNumber(summary.totalBoxes)} boxes</span>
+                      </div>
+                      <div className="pallet-card-box-list">
+                        {summary.boxBreakdown.map((entry) => (
+                          <span key={`${summary.id}-${entry.boxType}`} className="pallet-box-pill">
+                            {entry.boxType}: {formatNumber(entry.count)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </section>
       ) : null}
@@ -1880,13 +3353,33 @@ export default function App() {
           {activeShipmentSubtab === "current" ? (
             <div className="shipment-subpanel">
               <p className="section-label">Current Shipments</p>
-              <div className="create-shipment-bar">
+              <div className="create-shipment-bar create-shipment-bar-filtered">
                 <input
+                  className="search-input"
                   type="text"
                   value={shipmentSearchTerm}
                   onChange={(event) => setShipmentSearchTerm(event.target.value)}
                   placeholder="Search shipments, supply IDs, supplies, or manufacturers"
                 />
+                <select
+                  className="shipment-filter-select"
+                  value={currentShipmentTypeFilter}
+                  onChange={(event) => setCurrentShipmentTypeFilter(event.target.value)}
+                >
+                  <option value="All">Shipment type: All</option>
+                  <option value="Local">Shipment type: Local</option>
+                  <option value="International">Shipment type: International</option>
+                </select>
+                <select
+                  className="shipment-filter-select"
+                  value={currentShipmentStatusFilter}
+                  onChange={(event) => setCurrentShipmentStatusFilter(event.target.value)}
+                >
+                  <option value="All">Status: All</option>
+                  <option value="Planning">Status: Planning</option>
+                  <option value="Consolidating">Status: Consolidating</option>
+                  <option value="Consolidation Complete">Status: Consolidated</option>
+                </select>
                 <button
                   type="button"
                   className="primary-button"
@@ -1895,15 +3388,15 @@ export default function App() {
                   Create New Shipment
                 </button>
               </div>
-              {rankedShipments.length === 0 ? (
+              {filteredCurrentShipments.length === 0 ? (
                 <p>
                   {currentShipments.length === 0
                     ? "No current shipments yet."
-                    : "No shipments matched that search."}
+                    : "No shipments matched those filters."}
                 </p>
               ) : (
                 <div className="shipment-list">
-                  {rankedShipments.map((shipment) => (
+                  {filteredCurrentShipments.map((shipment) => (
                     <article
                       key={shipment.id}
                       className={`shipment-card shipment-card-${getShipmentStatus(shipment).toLowerCase().replace(/\s+/g, "-")}`}
@@ -1916,130 +3409,179 @@ export default function App() {
 
                         return (
                       <div className="shipment-card-header">
-                        <div className="shipment-card-title">
-                          <div className="shipment-inline-edit">
-                            {editingShipmentField?.shipmentId === shipment.id &&
-                            editingShipmentField?.field === "recipientName" ? (
-                              <input
-                                className="shipment-inline-input"
-                                type="text"
-                                value={editingShipmentValue}
-                                onChange={(event) => setEditingShipmentValue(event.target.value)}
-                                onBlur={saveEditingShipmentField}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter") {
-                                    saveEditingShipmentField();
-                                  }
-                                  if (event.key === "Escape") {
-                                    cancelEditingShipmentField();
-                                  }
-                                }}
-                                autoFocus
-                              />
-                            ) : (
-                              <h3>{shipment.recipientName}</h3>
-                            )}
-                            <button
-                              type="button"
-                              className="edit-icon-button"
-                              aria-label={`Edit name for ${shipment.recipientName}`}
-                              onClick={() =>
-                                startEditingShipmentField(
-                                  shipment.id,
-                                  "recipientName",
-                                  shipment.recipientName
-                                )
-                              }
-                            >
-                              ✎
-                            </button>
-                          </div>
-                          <p className="shipment-card-subline">
-                            {formatNumber(shipment.items.length)} assigned items
-                          </p>
-                          <p className="shipment-card-subline shipment-card-valuation">
-                            {formatCurrency(shipmentValuation)} valuation
-                          </p>
-                          <div className="shipment-inline-edit shipment-card-subline shipment-inline-field">
-                            <span className="shipment-inline-label">Type:</span>
-                            {editingShipmentField?.shipmentId === shipment.id &&
-                            editingShipmentField?.field === "shipmentType" ? (
-                              <select
-                                className="shipment-inline-select"
-                                value={editingShipmentValue}
-                                onChange={(event) => {
-                                  const nextValue = event.target.value;
-                                  setEditingShipmentValue(nextValue);
-                                  saveShipmentFieldValue(
+                        <div className="shipment-card-left-column">
+                          <div className="shipment-card-title">
+                            <div className="shipment-inline-edit">
+                              {editingShipmentField?.shipmentId === shipment.id &&
+                              editingShipmentField?.field === "recipientName" ? (
+                                <input
+                                  className="shipment-inline-input"
+                                  type="text"
+                                  value={editingShipmentValue}
+                                  onChange={(event) => setEditingShipmentValue(event.target.value)}
+                                  onBlur={saveEditingShipmentField}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                      saveEditingShipmentField();
+                                    }
+                                    if (event.key === "Escape") {
+                                      cancelEditingShipmentField();
+                                    }
+                                  }}
+                                  autoFocus
+                                />
+                              ) : (
+                                <h3>{shipment.recipientName}</h3>
+                              )}
+                              <button
+                                type="button"
+                                className="edit-icon-button"
+                                aria-label={`Edit name for ${shipment.recipientName}`}
+                                onClick={() =>
+                                  startEditingShipmentField(
+                                    shipment.id,
+                                    "recipientName",
+                                    shipment.recipientName
+                                  )
+                                }
+                              >
+                                ✎
+                              </button>
+                            </div>
+                            <p className="shipment-card-subline">
+                              {formatNumber(shipment.items.length)} assigned items
+                            </p>
+                            <p className="shipment-card-subline shipment-card-valuation">
+                              {formatCurrency(shipmentValuation)} valuation
+                            </p>
+                            <div className="shipment-inline-edit shipment-card-subline shipment-inline-field">
+                              <span className="shipment-inline-label">Type:</span>
+                              {editingShipmentField?.shipmentId === shipment.id &&
+                              editingShipmentField?.field === "shipmentType" ? (
+                                <select
+                                  className="shipment-inline-select"
+                                  value={editingShipmentValue}
+                                  onChange={(event) => {
+                                    const nextValue = event.target.value;
+                                    setEditingShipmentValue(nextValue);
+                                    saveShipmentFieldValue(
+                                      shipment.id,
+                                      "shipmentType",
+                                      nextValue
+                                    );
+                                    setEditingShipmentField(null);
+                                    setEditingShipmentValue("");
+                                  }}
+                                  onBlur={cancelEditingShipmentField}
+                                  autoFocus
+                                >
+                                  {shipmentTypeOptions.map((option) => (
+                                    <option key={option} value={option}>{option}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span>{shipment.shipmentType || "No shipment type"}</span>
+                              )}
+                              <button
+                                type="button"
+                                className="edit-icon-button"
+                                aria-label={`Edit shipment type for ${shipment.recipientName}`}
+                                onClick={() =>
+                                  startEditingShipmentField(
                                     shipment.id,
                                     "shipmentType",
-                                    nextValue
-                                  );
-                                  setEditingShipmentField(null);
-                                  setEditingShipmentValue("");
-                                }}
-                                onBlur={cancelEditingShipmentField}
-                                autoFocus
+                                    shipment.shipmentType || "Local"
+                                  )
+                                }
                               >
-                                {shipmentTypeOptions.map((option) => (
-                                  <option key={option} value={option}>{option}</option>
-                                ))}
-                              </select>
-                            ) : (
-                              <span>{shipment.shipmentType || "No shipment type"}</span>
-                            )}
-                            <button
-                              type="button"
-                              className="edit-icon-button"
-                              aria-label={`Edit shipment type for ${shipment.recipientName}`}
-                              onClick={() =>
-                                startEditingShipmentField(
-                                  shipment.id,
-                                  "shipmentType",
-                                  shipment.shipmentType || "Local"
-                                )
-                              }
-                            >
-                              ✎
-                            </button>
+                                ✎
+                              </button>
+                            </div>
+                            <div className="shipment-inline-edit shipment-card-subline shipment-inline-field">
+                              <span className="shipment-inline-label">PoC:</span>
+                              {editingShipmentField?.shipmentId === shipment.id &&
+                              editingShipmentField?.field === "pointOfContact" ? (
+                                <input
+                                  className="shipment-inline-input"
+                                  type="text"
+                                  value={editingShipmentValue}
+                                  onChange={(event) => setEditingShipmentValue(event.target.value)}
+                                  onBlur={saveEditingShipmentField}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                      saveEditingShipmentField();
+                                    }
+                                    if (event.key === "Escape") {
+                                      cancelEditingShipmentField();
+                                    }
+                                  }}
+                                  autoFocus
+                                />
+                              ) : (
+                                <span>{shipment.pointOfContact || "No point of contact"}</span>
+                              )}
+                              <button
+                                type="button"
+                                className="edit-icon-button"
+                                aria-label={`Edit point of contact for ${shipment.recipientName}`}
+                                onClick={() =>
+                                  startEditingShipmentField(
+                                    shipment.id,
+                                    "pointOfContact",
+                                    shipment.pointOfContact
+                                  )
+                                }
+                              >
+                                ✎
+                              </button>
+                            </div>
                           </div>
-                          <div className="shipment-inline-edit shipment-card-subline shipment-inline-field">
-                            <span className="shipment-inline-label">PoC:</span>
-                            {editingShipmentField?.shipmentId === shipment.id &&
-                            editingShipmentField?.field === "pointOfContact" ? (
-                              <input
-                                className="shipment-inline-input"
-                                type="text"
-                                value={editingShipmentValue}
-                                onChange={(event) => setEditingShipmentValue(event.target.value)}
-                                onBlur={saveEditingShipmentField}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter") {
-                                    saveEditingShipmentField();
+                          <div className="shipment-bottom-left-stack">
+                            <div className="shipment-history-column shipment-history-column-current">
+                              <span className="shipment-status-label">Shipment History</span>
+                              <div className="shipment-history-list">
+                                <span>Created: {formatCurrentShipmentHistoryDate(shipment.createdAt)}</span>
+                                <span>
+                                  Consolidating start:{" "}
+                                  {formatCurrentShipmentHistoryDate(shipment.consolidationStartedAt)}
+                                </span>
+                                <span>
+                                  Consolidation complete:{" "}
+                                  {formatCurrentShipmentHistoryDate(shipment.consolidationCompletedAt)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="shipment-notes-panel shipment-notes-panel-current">
+                              <span className="shipment-status-label">Shipment Notes</span>
+                              {editingShipmentNotesId === shipment.id ? (
+                                <textarea
+                                  className="shipment-notes-editor"
+                                  value={editingShipmentNotesValue}
+                                  onChange={(event) => setEditingShipmentNotesValue(event.target.value)}
+                                  onBlur={saveEditingShipmentNotes}
+                                  onKeyDown={(event) => {
+                                    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                                      saveEditingShipmentNotes();
+                                    }
+                                    if (event.key === "Escape") {
+                                      cancelEditingShipmentNotes();
+                                    }
+                                  }}
+                                  placeholder="Add shipment notes"
+                                  autoFocus
+                                />
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="shipment-notes-copy"
+                                  onClick={() =>
+                                    startEditingShipmentNotes(shipment.id, shipment.shipmentNotes)
                                   }
-                                  if (event.key === "Escape") {
-                                    cancelEditingShipmentField();
-                                  }
-                                }}
-                                autoFocus
-                              />
-                            ) : (
-                              <span>{shipment.pointOfContact || "No point of contact"}</span>
-                            )}
-                            <button
-                              type="button"
-                              className="edit-icon-button"
-                              aria-label={`Edit point of contact for ${shipment.recipientName}`}
-                              onClick={() =>
-                                startEditingShipmentField(
-                                  shipment.id,
-                                  "pointOfContact",
-                                  shipment.pointOfContact
-                                )
-                              }
-                            >
-                              ✎
-                            </button>
+                                >
+                                  {shipment.shipmentNotes || "No shipment notes recorded."}
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div className="shipment-status-panel">
@@ -2087,17 +3629,8 @@ export default function App() {
                               </button>
                             </div>
                           </div>
-                          <div className="shipment-action-column">
-                            <button
-                              type="button"
-                              className="secondary-button"
-                              onClick={() => consolidateAllShipmentItems(shipment.id)}
-                              disabled={shipment.items.length === 0}
-                            >
-                              Consolidate All
-                            </button>
-                          </div>
                         </div>
+                        <ShipmentDistributionChart shipmentItems={shipment.items} />
                         <div className="shipment-card-actions">
                           <button
                             type="button"
@@ -2114,6 +3647,14 @@ export default function App() {
                             onClick={() => openAddSupplyIdsModal(shipment.id)}
                           >
                             Add Supplies via ID
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => consolidateAllShipmentItems(shipment.id)}
+                            disabled={shipment.items.length === 0}
+                          >
+                            Consolidate All
                           </button>
                           <button
                             type="button"
@@ -2250,18 +3791,62 @@ export default function App() {
           {activeShipmentSubtab === "past" ? (
             <div className="shipment-subpanel">
               <p className="section-label">Past Shipments</p>
-              {pastShipments.length === 0 ? (
-                <p>No past shipments yet.</p>
+              <div className="create-shipment-bar create-shipment-bar-past">
+                <input
+                  className="search-input"
+                  type="text"
+                  value={shipmentSearchTerm}
+                  onChange={(event) => setShipmentSearchTerm(event.target.value)}
+                  placeholder="Search shipments, supply IDs, supplies, or manufacturers"
+                />
+                <select
+                  className="shipment-filter-select"
+                  value={pastShipmentTypeFilter}
+                  onChange={(event) => setPastShipmentTypeFilter(event.target.value)}
+                >
+                  <option value="All">Shipment type: All</option>
+                  <option value="Local">Shipment type: Local</option>
+                  <option value="International">Shipment type: International</option>
+                </select>
+                <select
+                  className="shipment-filter-select"
+                  value={pastShipmentStatusDateFilter}
+                  onChange={(event) => setPastShipmentStatusDateFilter(event.target.value)}
+                >
+                  <option value="creation">Status date: Creation</option>
+                  <option value="consolidation">Status date: Consolidation</option>
+                  <option value="ship">Status date: Ship</option>
+                  <option value="delivery">Status date: Delivery</option>
+                </select>
+              </div>
+              {filteredPastShipments.length === 0 ? (
+                <p>
+                  {normalizedShipmentSearch || pastShipmentTypeFilter !== "All"
+                    ? "No past shipments matched those filters."
+                    : "No past shipments yet."}
+                </p>
               ) : (
                 <div className="shipment-list">
-                  {pastShipments.map((shipment) => {
+                  {filteredPastShipments.map((shipment) => {
                     const shipmentValuation = shipment.items.reduce(
                       (total, item) => total + requestedShipmentItemValue(item),
                       0
                     );
+                    const pastShipmentStatus = normalizePastShipmentStatus(
+                      shipment.pastShipmentStatus,
+                      shipment.deliveryDate
+                    );
 
                     return (
-                      <article key={shipment.id} className="shipment-card shipment-card-complete">
+                      <article
+                        key={shipment.id}
+                        id={`past-shipment-${shipment.id}`}
+                        className={
+                          pastShipmentStatus === "Delivered"
+                            ? "shipment-card shipment-card-complete shipment-card-delivered"
+                            : "shipment-card shipment-card-past"
+                        }
+                      >
                         <div className="shipment-card-header">
                           <div className="shipment-card-title">
                             <h3>{shipment.recipientName}</h3>
@@ -2272,11 +3857,144 @@ export default function App() {
                               {formatCurrency(shipmentValuation)} valuation
                             </p>
                           </div>
-                          <div className="shipment-status-panel">
-                            <span className="shipment-status-label">Shipment Status</span>
-                            <span className="shipment-status-badge">Shipped</span>
+                          <div className="shipment-history-column">
+                            <span className="shipment-status-label">Shipment Details</span>
+                            <div className="shipment-history-list">
+                              <span>{shipment.shipmentType || "Not set"}</span>
+                              <span>{shipment.pointOfContact || "No point of contact"}</span>
+                              <span>{shipment.transportType || "Method not set"}</span>
+                            </div>
+                          </div>
+                          <div className="shipment-history-column">
+                            <span className="shipment-status-label">Shipment History</span>
+                            <div className="shipment-history-list">
+                              <span>Created: {formatShipmentHistoryDate(shipment.createdAt)}</span>
+                              <span>
+                                Consolidating start:{" "}
+                                {formatShipmentHistoryDate(shipment.consolidationStartedAt)}
+                              </span>
+                              <span>
+                                Consolidated: {formatShipmentHistoryDate(shipment.consolidationCompletedAt)}
+                              </span>
+                              <span>Shipped: {formatShipmentHistoryDate(shipment.shippedAt)}</span>
+                              <span>Delivered: {formatShipmentHistoryDate(shipment.deliveryDate)}</span>
+                            </div>
+                          </div>
+                          <ShipmentDistributionChart shipmentItems={shipment.items} />
+                          <div className="shipment-status-panel shipment-status-panel-past">
+                            <div className="shipment-status-column">
+                              <span className="shipment-status-label">Shipment Status</span>
+                              <select
+                                className={
+                                  pastShipmentStatus === "Delivered"
+                                    ? "shipment-status-select shipment-status-select-delivered"
+                                    : "shipment-status-select"
+                                }
+                                value={pastShipmentStatus}
+                                onChange={(event) =>
+                                  updatePastShipmentStatus(shipment.id, event.target.value)
+                                }
+                              >
+                                <option value="Shipped">Shipped</option>
+                                <option value="Delivered">Delivered</option>
+                              </select>
+                            </div>
                           </div>
                         </div>
+                        <div className="shipment-notes-panel">
+                          <span className="shipment-status-label">Shipment Notes</span>
+                          {editingShipmentNotesId === shipment.id ? (
+                            <textarea
+                              className="shipment-notes-editor"
+                              value={editingShipmentNotesValue}
+                              onChange={(event) => setEditingShipmentNotesValue(event.target.value)}
+                              onBlur={saveEditingShipmentNotes}
+                              onKeyDown={(event) => {
+                                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                                  saveEditingShipmentNotes();
+                                }
+                                if (event.key === "Escape") {
+                                  cancelEditingShipmentNotes();
+                                }
+                              }}
+                              placeholder="Add shipment notes"
+                              autoFocus
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              className="shipment-notes-copy"
+                              onClick={() =>
+                                startEditingShipmentNotes(shipment.id, shipment.shipmentNotes)
+                              }
+                            >
+                              {shipment.shipmentNotes || "No shipment notes recorded."}
+                            </button>
+                          )}
+                        </div>
+                        <div className="shipment-card-actions">
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => toggleShipmentSupplies(shipment.id)}
+                          >
+                            {expandedShipmentIds.includes(shipment.id)
+                              ? "Hide Supplies"
+                              : "Show Supplies"}
+                          </button>
+                        </div>
+                        {shipment.items.length > 0 && expandedShipmentIds.includes(shipment.id) ? (
+                          <div className="shipment-line-items">
+                            {shipment.items.map((shipmentItem) => {
+                              const requestedQuantity = normalizeRequestedQuantity(shipmentItem);
+                              const isRequestingAllUnits =
+                                requestedQuantity === (Number(shipmentItem.quantity) || 0);
+
+                              return (
+                                <div key={shipmentItem.id} className="shipment-line-item">
+                                  <div className="shipment-line-top shipment-line-top-past">
+                                    <div className="shipment-item-id-row">
+                                      <strong>#{shipmentItem.supplyId}</strong>
+                                      <button
+                                        type="button"
+                                        className="info-icon-button"
+                                        onClick={() => openDetailsModal(shipmentItem)}
+                                        aria-label={`Open details for supply ${shipmentItem.supplyId}`}
+                                      >
+                                        ⓘ
+                                      </button>
+                                      <span>{shipmentItem.exactSupplyName}</span>
+                                    </div>
+                                    <div className="shipment-line-middle">
+                                      <strong>{shipmentItem.locationInfo}</strong>
+                                      <strong>{formatNumber(shipmentItem.quantity)} units</strong>
+                                      <span className="shipment-request-summary">
+                                        {isRequestingAllUnits
+                                          ? `Requested all ${formatNumber(shipmentItem.quantity)} units`
+                                          : `Requested ${formatNumber(requestedQuantity)} of ${formatNumber(shipmentItem.quantity)} units`}
+                                      </span>
+                                    </div>
+                                    <div className="shipment-line-pricing">
+                                      <span>{formatCurrency(shipmentItem.unitPrice)} per unit</span>
+                                      <span>{formatCurrency(requestedShipmentItemValue(shipmentItem))} total</span>
+                                    </div>
+                                    <div className="shipment-expiration">
+                                      <span>{shipmentItem.expirationDate}</span>
+                                      <span
+                                        className={`expiration-pill ${shipmentItem.expirationStatus.tone}`}
+                                      >
+                                        {shipmentItem.expirationStatus.label}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="shipment-line-meta">
+                                    <span>{shipmentItem.generalSupply}</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : null}
                       </article>
                     );
                   })}
@@ -2298,57 +4016,103 @@ export default function App() {
 
           <div className="metrics-grid">
             <MetricCard label="Total Shipments" value={formatNumber(shipments.length)} />
-            <MetricCard label="Shipments With Items" value={formatNumber(shipmentsWithItems.length)} />
-            <MetricCard label="Total Units Assigned" value={formatNumber(totalShipmentUnits)} />
-            <MetricCard label="Total Shipment Line Items" value={formatNumber(totalShipmentLines)} />
+            <MetricCard label="Current Shipments" value={formatNumber(currentShipments.length)} />
+            <MetricCard label="Completed Shipments" value={formatNumber(pastShipments.length)} />
+            <MetricCard label="Recurring Shipments" value={formatNumber(recurringShipmentCount)} />
             <MetricCard label="Unique Recipients" value={formatNumber(uniqueShipmentRecipients)} />
-            <MetricCard label="Avg Units Per Shipment" value={formatNumber(Math.round(averageUnitsPerShipment))} />
+            <MetricCard label="Total Units Shipped" value={formatNumber(totalShippedUnits)} />
+            <MetricCard label="Avg Units Per Shipment" value={formatNumber(Math.round(averageUnitsPerShippedShipment))} />
+            <MetricCard label="Total Valuation Shipped" value={formatCurrency(totalShippedValuation)} />
+            <MetricCard label="Avg Valuation Per Shipment" value={formatCurrency(averageShipmentValuation)} />
             <MetricCard label="Near-Expiry Units In Shipments" value={formatNumber(nearExpiryShipmentUnits)} />
-            <MetricCard label="Categories Being Shipped" value={formatNumber(shippedCategoryCount)} />
           </div>
 
-          <div className="summary-card">
-            <div className="panel-header">
-              <div>
-                <p className="section-label">Shipment Mix</p>
-                <h3>Shipments by destination type</h3>
-              </div>
-            </div>
+          <div className="shipment-kpi-grid">
+            <div className="shipment-kpi-column">
+              <div className="summary-card">
+                <div className="panel-header">
+                  <div>
+                    <p className="section-label">Shipment Mix</p>
+                    <h3>Shipments by destination type</h3>
+                  </div>
+                </div>
 
-            {shipmentsByType.length > 0 ? (
-              <div className="expiry-chart-card">
-                <div className="expiry-bars">
-                  {shipmentsByType.map((shipmentType) => {
-                    const width = maxShipmentTypeCount > 0
-                      ? (shipmentType.count / maxShipmentTypeCount) * 100
-                      : 0;
-
-                    return (
-                      <div className="expiry-bar-row" key={shipmentType.type}>
-                        <div className="expiry-bar-labels">
-                          <strong>{shipmentType.type}</strong>
-                          <span>{formatNumber(shipmentType.count)} shipments</span>
-                        </div>
-                        <div className="expiry-bar-track" aria-hidden="true">
-                          <div
-                            className="expiry-bar-fill expiry-bar-fill-secondary"
-                            style={{ width: `${width}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="expiry-chart-card">
+                  <ShipmentBarChart data={shipmentsByType.map((entry) => ({
+                    label: entry.type,
+                    count: entry.count,
+                  }))} variant="secondary" />
                 </div>
               </div>
-            ) : null}
 
-            <div className="kpi-note-card">
-              <p className="section-label">Next Metrics To Add</p>
-              <p>
-                Fill rate and request-to-shipment time will need request dates and requested quantities
-                added to the shipment data model.
-              </p>
+              <div className="summary-card">
+                <div className="panel-header">
+                  <div>
+                    <p className="section-label">Shipment Status</p>
+                    <h3>Shipments by current status</h3>
+                  </div>
+                </div>
+
+                <div className="expiry-chart-card">
+                  <ShipmentBarChart data={shipmentStatusCounts.map((entry) => ({
+                    label: entry.label,
+                    count: entry.count,
+                  }))} />
+                </div>
+              </div>
             </div>
+
+            <div className="shipment-kpi-column">
+              <div className="summary-card">
+                <div className="panel-header">
+                  <div>
+                    <p className="section-label">Shipment Value by Year</p>
+                    <h3>Cumulative value shipped this year</h3>
+                  </div>
+                </div>
+
+                <div className="expiry-chart-card">
+                  {shipmentValueByYearPoints.length > 0 ? (
+                    <ShipmentValueLineChart
+                      points={shipmentValueByYearPoints}
+                      xAxisEndLabel="Dec 31"
+                      onSelectShipment={jumpToPastShipment}
+                    />
+                  ) : (
+                    <p>No shipped-value history is available yet for this calendar year.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="summary-card">
+                <div className="panel-header">
+                  <div>
+                    <p className="section-label">Shipment Items by Year</p>
+                    <h3>Cumulative total items shipped this year</h3>
+                  </div>
+                </div>
+
+                <div className="expiry-chart-card">
+                  {shipmentItemsByYearPoints.length > 0 ? (
+                    <ShipmentItemsLineChart
+                      points={shipmentItemsByYearPoints}
+                      xAxisEndLabel="Dec 31"
+                      onSelectShipment={jumpToPastShipment}
+                    />
+                  ) : (
+                    <p>No shipped-item history is available yet for this calendar year.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="kpi-note-card">
+            <p className="section-label">Next Metrics To Add</p>
+            <p>
+              Fill rate and request-to-shipment time will need request dates and requested quantities
+              added to the shipment data model.
+            </p>
           </div>
         </section>
       ) : null}
@@ -2657,6 +4421,58 @@ export default function App() {
         </div>
       ) : null}
 
+      {activePalletSummary ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setActivePalletId(null)}>
+          <div
+            className="shipment-modal shipment-modal-large pallet-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pallet-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">Pallet Details</p>
+                <h2 id="pallet-modal-title">{activePalletSummary.label}</h2>
+                <div className="pallet-modal-metrics">
+                  <div className="pallet-modal-metric-card">
+                    <span>Total Supplies</span>
+                    <strong>{formatNumber(activePalletTotalSupplies)}</strong>
+                  </div>
+                  <div className="pallet-modal-metric-card">
+                    <span>Total Boxes</span>
+                    <strong>{formatNumber(activePalletTotalBoxes)}</strong>
+                  </div>
+                  <div className="pallet-modal-metric-card">
+                    <span>Total Value</span>
+                    <strong>{formatCurrency(activePalletTotalValue)}</strong>
+                  </div>
+                </div>
+                <p className="pallet-modal-supplies">
+                  {formatNumber(activePalletExpiredSupplies)} supplies expired,{" "}
+                  {formatNumber(activePalletExpiringSoonSupplies)} expiring in 90 days
+                </p>
+              </div>
+              <button type="button" className="modal-close" onClick={() => setActivePalletId(null)}>
+                x
+              </button>
+            </div>
+
+            <div className="pallet-mini-chart-grid">
+              {palletDetailCharts.map((chart) => (
+                <CompactPalletPieChart
+                  key={`${activePalletSummary.id}-${chart.title}`}
+                  title={chart.title}
+                  ariaLabel={chart.ariaLabel}
+                  segments={chart.segments}
+                  tooltipFormatter={chart.tooltipFormatter}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {detailsItem ? (
         <div className="modal-backdrop" role="presentation" onClick={closeDetailsModal}>
           <div
@@ -2923,6 +4739,65 @@ export default function App() {
                 disabled={!shipmentSupplyIdsInput.trim()}
               >
                 Add Supplies
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deliveringShipmentId ? (
+        <div className="modal-backdrop" role="presentation" onClick={closeDeliveredModal}>
+          <div
+            className="shipment-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delivered-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">Delivered</p>
+                <h2 id="delivered-modal-title">Confirm delivered status</h2>
+              </div>
+              <button type="button" className="modal-close" onClick={closeDeliveredModal}>
+                x
+              </button>
+            </div>
+
+            <div className="shipment-modal-body">
+              <label className="modal-field">
+                <span>Delivery Date</span>
+                <input
+                  type="date"
+                  value={deliveryDate}
+                  onChange={(event) => setDeliveryDate(event.target.value)}
+                />
+              </label>
+              <label className="modal-field">
+                <span>Notes</span>
+                <textarea
+                  value={shipmentNotes}
+                  onChange={(event) => setShipmentNotes(event.target.value)}
+                  placeholder="Add or update delivery notes"
+                />
+              </label>
+            </div>
+
+            <div className="shipment-modal-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeDeliveredModal}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={saveDeliveredStatus}
+                disabled={!deliveryDate.trim()}
+              >
+                Save Delivered Status
               </button>
             </div>
           </div>
