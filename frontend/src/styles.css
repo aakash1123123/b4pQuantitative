@@ -126,6 +126,14 @@ table {
   gap: 16px;
 }
 
+.shipment-timing-grid {
+  margin-top: 16px;
+}
+
+.shipment-flow-metrics-header {
+  margin-top: 24px;
+}
+
 .metric-card {
   padding: 18px;
   border-radius: 20px;

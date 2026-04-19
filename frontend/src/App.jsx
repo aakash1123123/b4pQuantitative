@@ -232,6 +232,18 @@ function daysBetweenDates(targetDateValue, referenceDateValue) {
   return Math.round((targetDate - referenceDate) / 86400000);
 }
 
+function averageShipmentDays(shipments, startField, endField) {
+  const values = shipments
+    .map((shipment) => daysBetweenDates(shipment[endField], shipment[startField]))
+    .filter((value) => value !== null);
+
+  return average(values);
+}
+
+function formatAverageDays(value) {
+  return `${value.toFixed(1)} days`;
+}
+
 function expirationStatus(diff) {
   if (diff === null) {
     return {
@@ -2610,6 +2622,64 @@ export default function App() {
       )
     )
   );
+  const localShipments = shipments.filter(
+    (shipment) => normalizeShipmentType(shipment.shipmentType) === "Local"
+  );
+  const internationalShipments = shipments.filter(
+    (shipment) => normalizeShipmentType(shipment.shipmentType) === "International"
+  );
+  const shipmentTimingMetrics = [
+    {
+      scope: "Local",
+      label: "Avg Days From Creation to Shipment",
+      value: averageShipmentDays(localShipments, "createdAt", "shippedAt"),
+    },
+    {
+      scope: "Local",
+      label: "Avg Time to Start Consolidation",
+      value: averageShipmentDays(localShipments, "createdAt", "consolidationStartedAt"),
+    },
+    {
+      scope: "Local",
+      label: "Avg Consolidation Time",
+      value: averageShipmentDays(localShipments, "consolidationStartedAt", "consolidationCompletedAt"),
+    },
+    {
+      scope: "Local",
+      label: "Avg Waiting Time to Ship",
+      value: averageShipmentDays(localShipments, "consolidationCompletedAt", "shippedAt"),
+    },
+    {
+      scope: "Local",
+      label: "Avg Delivery Time",
+      value: averageShipmentDays(localShipments, "shippedAt", "deliveryDate"),
+    },
+    {
+      scope: "International",
+      label: "Avg Days From Creation to Shipment",
+      value: averageShipmentDays(internationalShipments, "createdAt", "shippedAt"),
+    },
+    {
+      scope: "International",
+      label: "Avg Time to Start Consolidation",
+      value: averageShipmentDays(internationalShipments, "createdAt", "consolidationStartedAt"),
+    },
+    {
+      scope: "International",
+      label: "Avg Consolidation Time",
+      value: averageShipmentDays(internationalShipments, "consolidationStartedAt", "consolidationCompletedAt"),
+    },
+    {
+      scope: "International",
+      label: "Avg Waiting Time to Ship",
+      value: averageShipmentDays(internationalShipments, "consolidationCompletedAt", "shippedAt"),
+    },
+    {
+      scope: "International",
+      label: "Avg Delivery Time",
+      value: averageShipmentDays(internationalShipments, "shippedAt", "deliveryDate"),
+    },
+  ];
   const shipmentsByType = shipmentTypeOptions.map((type) => ({
     type,
     count: shipments.filter((shipment) => normalizeShipmentType(shipment.shipmentType) === type).length,
@@ -4105,6 +4175,24 @@ export default function App() {
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="panel-header shipment-flow-metrics-header">
+            <div>
+              <p className="section-label">Shipment flow time metrics</p>
+              <h3>Shipment flow time metrics</h3>
+            </div>
+          </div>
+
+          <div className="metrics-grid shipment-timing-grid">
+            {shipmentTimingMetrics.map((metric) => (
+              <MetricCard
+                key={`${metric.scope}-${metric.label}`}
+                label={`${metric.scope} ${metric.label}`}
+                value={formatAverageDays(metric.value)}
+                valueClassName="metric-value-compact"
+              />
+            ))}
           </div>
 
           <div className="kpi-note-card">
