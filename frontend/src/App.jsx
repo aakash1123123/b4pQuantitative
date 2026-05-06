@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
 const SHIPMENT_STORAGE_KEY = "blueprints-current-shipments";
 const PALLET_MAP_STORAGE_KEY = "blueprints-pallet-map-layout";
 const PALLET_MAP_DIMENSIONS = { width: 1520, height: 1120 };
