@@ -30,7 +30,7 @@ app.add_middleware(
 # ==============================
 # GOOGLE SHEET CONFIG
 # ==============================
-SHEET_ID = "1qBjJIUajjDFhhYu0Zr_zZYPErsFQKXFOInAgZnHLNxs"
+SHEET_ID = "1OiT1QBBnlazfRCv0MgwE_LXvIVJNAVQha1Ez7M4Vc88"
 SHEET_GID = "384285232"
 SHEET_URL = (
     f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export"
