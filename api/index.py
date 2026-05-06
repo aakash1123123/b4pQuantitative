@@ -4,4 +4,4 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.app import app
 from mangum import Mangum
 
-handler = Mangum(app, lifespan="off", api_gateway_base_path="/api")
+handler = Mangum(app, lifespan="off")

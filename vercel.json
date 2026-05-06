@@ -4,7 +4,8 @@
   "outputDirectory": "frontend/dist",
   "framework": null,
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/index.py" },
+    { "src": "/items(.*)", "dest": "/api/index.py" },
+    { "src": "/kpis(.*)", "dest": "/api/index.py" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
