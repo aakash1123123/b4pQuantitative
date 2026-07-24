@@ -2111,6 +2111,7 @@ button.shipment-notes-copy {
 .modal-backdrop {
   position: fixed;
   inset: 0;
+  z-index: 2000;
   display: grid;
   place-items: center;
   padding: 20px;
@@ -2297,6 +2298,11 @@ button.shipment-notes-copy {
   border: 1px solid #c2d7ee;
   background: #eef5fd;
   color: #24517d;
+}
+
+.secondary-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .shipment-return-button {

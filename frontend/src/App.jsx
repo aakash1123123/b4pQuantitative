@@ -1951,6 +1951,29 @@ export default function App() {
     closeConsolidationModal();
   }
 
+  function unconsolidateShipmentItem(shipmentId, itemId) {
+    setShipments((currentShipments) =>
+      currentShipments.map((shipment) => {
+        if (shipment.id !== shipmentId) {
+          return shipment;
+        }
+
+        return withConsolidationCompletionDate({
+          ...shipment,
+          items: shipment.items.map((item) =>
+            String(item.id) === String(itemId)
+              ? {
+                  ...item,
+                  isConsolidated: false,
+                  consolidationDetails: undefined,
+                }
+              : item
+          ),
+        });
+      })
+    );
+  }
+
   function addSuppliesToShipmentById() {
     if (!addingSupplyIdsShipmentId) {
       return;
@@ -3883,10 +3906,13 @@ export default function App() {
                                         ? "consolidated-button is-consolidated"
                                         : "consolidated-button"
                                     }
-                                    onClick={() => openConsolidationModal(shipment.id, shipmentItem)}
-                                    disabled={shipmentItem.isConsolidated}
+                                    onClick={() =>
+                                      shipmentItem.isConsolidated
+                                        ? unconsolidateShipmentItem(shipment.id, shipmentItem.id)
+                                        : openConsolidationModal(shipment.id, shipmentItem)
+                                    }
                                   >
-                                    Consolidate
+                                    {shipmentItem.isConsolidated ? "Unconsolidate" : "Consolidate"}
                                   </button>
                                     <button
                                       type="button"
