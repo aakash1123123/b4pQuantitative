@@ -1305,6 +1305,7 @@ export default function App() {
   const [isCreateShipmentModalOpen, setIsCreateShipmentModalOpen] = useState(false);
   const [detailsItem, setDetailsItem] = useState(null);
   const [returningShipmentItem, setReturningShipmentItem] = useState(null);
+  const [returningShipmentItems, setReturningShipmentItems] = useState(null);
   const [requestingShipmentItem, setRequestingShipmentItem] = useState(null);
   const [consolidatingShipmentItem, setConsolidatingShipmentItem] = useState(null);
   const [bulkConsolidationCheck, setBulkConsolidationCheck] = useState(null);
@@ -1950,6 +1951,22 @@ export default function App() {
     setReturningShipmentItem(null);
   }
 
+  function openReturnAllToInventoryModal(shipment) {
+    setReturningShipmentItems({
+      shipmentId: shipment.id,
+      shipmentName: shipment.recipientName,
+      itemCount: shipment.items.length,
+      unitCount: shipment.items.reduce(
+        (total, item) => total + normalizeRequestedQuantity(item),
+        0
+      ),
+    });
+  }
+
+  function closeReturnAllToInventoryModal() {
+    setReturningShipmentItems(null);
+  }
+
   function openRequestedUnitsModal(shipmentId, shipmentItem) {
     setRequestingShipmentItem({ shipmentId, shipmentItem });
     setRequestedUnitsValue(
@@ -2093,6 +2110,21 @@ export default function App() {
       })
     );
     closeReturnToInventoryModal();
+  }
+
+  function returnAllShipmentItemsToInventory() {
+    if (!returningShipmentItems) {
+      return;
+    }
+
+    setShipments((currentShipments) =>
+      currentShipments.map((shipment) =>
+        shipment.id === returningShipmentItems.shipmentId
+          ? { ...shipment, items: [] }
+          : shipment
+      )
+    );
+    closeReturnAllToInventoryModal();
   }
 
   function saveRequestedUnits() {
@@ -4038,6 +4070,14 @@ export default function App() {
                           </button>
                           <button
                             type="button"
+                            className="secondary-button"
+                            onClick={() => openReturnAllToInventoryModal(shipment)}
+                            disabled={shipment.items.length === 0}
+                          >
+                            Back All to Inventory
+                          </button>
+                          <button
+                            type="button"
                             className="primary-button"
                             onClick={() => openShippingModal(shipment.id)}
                             disabled={
@@ -5014,6 +5054,59 @@ export default function App() {
                 onClick={returnShipmentItemToInventory}
               >
                 Confirm Return
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {returningShipmentItems ? (
+        <div className="modal-backdrop" role="presentation" onClick={closeReturnAllToInventoryModal}>
+          <div
+            className="shipment-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="return-all-to-inventory-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">Inventory Check</p>
+                <h2 id="return-all-to-inventory-modal-title">
+                  Send all supplies back to inventory?
+                </h2>
+              </div>
+              <button type="button" className="modal-close" onClick={closeReturnAllToInventoryModal}>
+                x
+              </button>
+            </div>
+
+            <div className="shipment-modal-body">
+              <p className="modal-item-name">
+                Return all <strong>{formatNumber(returningShipmentItems.itemCount)} supplies</strong>{" "}
+                ({formatNumber(returningShipmentItems.unitCount)} requested units) from{" "}
+                <strong>{returningShipmentItems.shipmentName}</strong> to Total Inventory?
+              </p>
+              <p className="shipment-empty">
+                This will empty the shipment and change every included supply from pulled back to
+                available in Total Inventory.
+              </p>
+            </div>
+
+            <div className="shipment-modal-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeReturnAllToInventoryModal}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={returnAllShipmentItemsToInventory}
+              >
+                Confirm Return All
               </button>
             </div>
           </div>
