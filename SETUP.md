@@ -25,9 +25,9 @@ In the first PowerShell terminal:
 
 ```powershell
 cd backend
-py -m pip install -r requirements.txt
+python -m pip install -r requirements.txt
 $env:GOOGLE_SHEETS_CREDENTIALS_PATH = (Resolve-Path ".\credentials.json")
-py -m uvicorn app:app --reload
+python -m uvicorn app:app --reload
 ```
 
 The API runs at `http://127.0.0.1:8000`. Verify it at:

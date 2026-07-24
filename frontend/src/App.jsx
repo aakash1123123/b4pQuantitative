@@ -2833,17 +2833,6 @@ export default function App() {
               <h2>Every supply as a line item</h2>
             </div>
             <div className="inventory-actions">
-              <label className="availability-toggle">
-                <span>Show Available Items</span>
-                <button
-                  type="button"
-                  className={showAvailableItems ? "toggle-switch on" : "toggle-switch"}
-                  onClick={() => setShowAvailableItems((current) => !current)}
-                  aria-pressed={showAvailableItems}
-                >
-                  <span className="toggle-knob" />
-                </button>
-              </label>
               <button
                 type="button"
                 className="primary-button"
@@ -2890,6 +2879,19 @@ export default function App() {
                   onChange={(event) => setSearchTerm(event.target.value)}
                   placeholder="Search by general supply, exact name, or manufacturer"
                 />
+              </div>
+
+              <div className="availability-toggle filter-availability-toggle">
+                <span>Show Available Items</span>
+                <button
+                  type="button"
+                  className={showAvailableItems ? "toggle-switch on" : "toggle-switch"}
+                  onClick={() => setShowAvailableItems((current) => !current)}
+                  aria-label="Show available inventory items only"
+                  aria-pressed={showAvailableItems}
+                >
+                  <span className="toggle-knob" />
+                </button>
               </div>
 
               <div className="filter-group">

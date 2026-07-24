@@ -1222,6 +1222,16 @@ table {
   font-weight: 700;
 }
 
+.filter-availability-toggle {
+  width: 100%;
+  justify-content: space-between;
+  padding: 18px 0;
+}
+
+.filters-sidebar .search-row {
+  margin-bottom: 0;
+}
+
 .toggle-switch {
   position: relative;
   width: 52px;
