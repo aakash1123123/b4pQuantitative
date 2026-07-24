@@ -107,7 +107,7 @@ function withConsolidationCompletionDate(shipment) {
   return {
     ...shipment,
     consolidationStartedAt: anyConsolidated ? shipment.consolidationStartedAt || todayIsoDate() : "",
-    consolidationCompletedAt: shipment.consolidationCompletedAt || "",
+    consolidationCompletedAt: "",
   };
 }
 
@@ -1868,25 +1868,6 @@ export default function App() {
     setShipmentNotes("");
   }
 
-  function toggleShipmentItemConsolidated(shipmentId, itemId) {
-    setShipments((currentShipments) =>
-      currentShipments.map((shipment) => {
-        if (shipment.id !== shipmentId) {
-          return shipment;
-        }
-
-        return {
-          ...shipment,
-          items: shipment.items.map((item) =>
-            String(item.id) === String(itemId)
-              ? { ...item, isConsolidated: !item.isConsolidated }
-              : item
-          ),
-        };
-      })
-    );
-  }
-
   function returnShipmentItemToInventory() {
     if (!returningShipmentItem) {
       return;
@@ -2005,16 +1986,24 @@ export default function App() {
           return shipment;
         }
 
+        if (shipment.items.length === 0) {
+          return shipment;
+        }
+
+        const shouldConsolidate = !shipment.items.every((item) => item.isConsolidated);
+
         return withConsolidationCompletionDate({
           ...shipment,
           items: shipment.items.map((item) => ({
             ...item,
-            isConsolidated: true,
-            consolidationDetails: {
-              exactMatch: true,
-              consolidatedQuantity: normalizeRequestedQuantity(item),
-              varianceReason: "",
-            },
+            isConsolidated: shouldConsolidate,
+            consolidationDetails: shouldConsolidate
+              ? {
+                  exactMatch: true,
+                  consolidatedQuantity: normalizeRequestedQuantity(item),
+                  varianceReason: "",
+                }
+              : undefined,
           })),
         });
       })
@@ -3749,7 +3738,10 @@ export default function App() {
                             onClick={() => consolidateAllShipmentItems(shipment.id)}
                             disabled={shipment.items.length === 0}
                           >
-                            Consolidate All
+                            {shipment.items.length > 0 &&
+                            shipment.items.every((item) => item.isConsolidated)
+                              ? "Unconsolidate All"
+                              : "Consolidate All"}
                           </button>
                           <button
                             type="button"
@@ -3892,8 +3884,9 @@ export default function App() {
                                         : "consolidated-button"
                                     }
                                     onClick={() => openConsolidationModal(shipment.id, shipmentItem)}
+                                    disabled={shipmentItem.isConsolidated}
                                   >
-                                    Consolidated
+                                    Consolidate
                                   </button>
                                     <button
                                       type="button"
