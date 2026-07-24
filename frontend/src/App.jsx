@@ -2915,6 +2915,9 @@ export default function App() {
                 onClick={() => openShipmentModal(selectedInventoryItems)}
               >
                 Add Selected To Shipment
+                {selectedInventoryItems.length > 0
+                  ? ` (${formatNumber(selectedInventoryItems.length)})`
+                  : ""}
               </button>
               <span className="pill">{formatNumber(filteredInventoryRows.length)} entries</span>
             </div>
