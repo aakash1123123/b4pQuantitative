@@ -1273,6 +1273,34 @@ table {
   gap: 12px;
 }
 
+.floating-inventory-actions {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #cfe0f2;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14px 32px rgba(13, 59, 111, 0.24);
+  backdrop-filter: blur(8px);
+  animation: floating-action-enter 160ms ease-out;
+}
+
+@keyframes floating-action-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .inventory-filter-button {
   display: inline-flex;
   align-items: center;
@@ -2341,6 +2369,14 @@ button.shipment-notes-copy {
 
   .inventory-actions {
     width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .floating-inventory-actions {
+    top: 12px;
+    right: 12px;
+    max-width: calc(100vw - 24px);
     flex-direction: column;
     align-items: stretch;
   }

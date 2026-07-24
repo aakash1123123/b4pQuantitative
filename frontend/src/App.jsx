@@ -1182,6 +1182,7 @@ export default function App() {
   const [showAvailableItems, setShowAvailableItems] = useState(false);
   const [showNonAvailableItems, setShowNonAvailableItems] = useState(false);
   const [isInventoryFiltersOpen, setIsInventoryFiltersOpen] = useState(false);
+  const [showFloatingInventoryAction, setShowFloatingInventoryAction] = useState(false);
   const [shipments, setShipments] = useState(defaultShipments);
   const [isShipmentModalOpen, setIsShipmentModalOpen] = useState(false);
   const [pendingShipmentItems, setPendingShipmentItems] = useState([]);
@@ -1232,6 +1233,7 @@ export default function App() {
   const [activePalletId, setActivePalletId] = useState(null);
   const [focusedPastShipmentId, setFocusedPastShipmentId] = useState(null);
   const palletMapRef = useRef(null);
+  const inventoryShipmentButtonRef = useRef(null);
 
   async function refreshDashboard(showLoader = false) {
     try {
@@ -1279,6 +1281,23 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const button = inventoryShipmentButtonRef.current;
+    if (activeTab !== "inventory" || loading || error || !button) {
+      setShowFloatingInventoryAction(false);
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(([entry]) => {
+      const hasScrolledPastButton =
+        !entry.isIntersecting && entry.boundingClientRect.bottom <= 16;
+      setShowFloatingInventoryAction(hasScrolledPastButton);
+    });
+
+    observer.observe(button);
+    return () => observer.disconnect();
+  }, [activeTab, loading, error]);
 
   useEffect(() => {
     try {
@@ -2889,6 +2908,7 @@ export default function App() {
                 Filters
               </button>
               <button
+                ref={inventoryShipmentButtonRef}
                 type="button"
                 className="primary-button"
                 disabled={selectedInventoryItems.length === 0}
@@ -2899,6 +2919,34 @@ export default function App() {
               <span className="pill">{formatNumber(filteredInventoryRows.length)} entries</span>
             </div>
           </div>
+
+          {showFloatingInventoryAction ? (
+            <div className="floating-inventory-actions">
+              <button
+                type="button"
+                className="secondary-button inventory-filter-button"
+                onClick={() => setIsInventoryFiltersOpen(true)}
+                aria-expanded={isInventoryFiltersOpen}
+                aria-controls="inventory-filters"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 6h16M7 12h10M10 18h4" />
+                </svg>
+                Filters
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                disabled={selectedInventoryItems.length === 0}
+                onClick={() => openShipmentModal(selectedInventoryItems)}
+              >
+                Add Selected To Shipment
+                {selectedInventoryItems.length > 0
+                  ? ` (${formatNumber(selectedInventoryItems.length)})`
+                  : ""}
+              </button>
+            </div>
+          ) : null}
 
           <div className="inventory-layout">
             {isInventoryFiltersOpen ? (
