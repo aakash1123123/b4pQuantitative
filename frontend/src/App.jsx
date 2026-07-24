@@ -700,6 +700,7 @@ function PieChartCard({
   cardClassName = "",
   centerLabel = "raw items",
   renderLegendDetail,
+  onSegmentClick,
 }) {
   const normalizedActiveLabel = (activeLabel || "").trim().toLowerCase();
 
@@ -739,7 +740,8 @@ function PieChartCard({
 
         <div className="expiration-pie-legend">
           {legendSegments.map((segment) => (
-            <div
+            <button
+              type="button"
               className={
                 normalizedActiveLabel === segment.label.trim().toLowerCase()
                   ? "expiration-pie-legend-row active"
@@ -748,6 +750,9 @@ function PieChartCard({
               key={segment.label}
               onPointerEnter={() => onHover(segment.label)}
               onPointerLeave={() => onHover(null)}
+              onFocus={() => onHover(segment.label)}
+              onBlur={() => onHover(null)}
+              onClick={() => onSegmentClick?.(segment)}
             >
                 <span
                   className="expiration-pie-swatch"
@@ -761,8 +766,13 @@ function PieChartCard({
                     ? renderLegendDetail(segment)
                     : `${formatNumber(segment.value)} items • ${segment.percentage}% of raw items`}
                 </span>
+                {normalizedActiveLabel === segment.label.trim().toLowerCase() ? (
+                  <span className="expiration-pie-click-hint">
+                    Click to view inventory
+                  </span>
+                ) : null}
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -1179,6 +1189,7 @@ export default function App() {
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedPallets, setSelectedPallets] = useState([]);
   const [selectedBoxTypes, setSelectedBoxTypes] = useState([]);
+  const [selectedWorkflowStatuses, setSelectedWorkflowStatuses] = useState([]);
   const [showAvailableItems, setShowAvailableItems] = useState(false);
   const [showNonAvailableItems, setShowNonAvailableItems] = useState(false);
   const [isInventoryFiltersOpen, setIsInventoryFiltersOpen] = useState(false);
@@ -1473,6 +1484,11 @@ export default function App() {
     }
   );
   const boxTypeOptions = buildFacetCounts(inventoryRowsWithStatus, "boxType");
+  const workflowStatusOptions = buildFacetCounts(
+    inventoryRowsWithShipmentStatus,
+    "supplyWorkflowStatus",
+    supplyStatusOrder
+  );
 
   useEffect(() => {
     setValuationRange({ min: minUnitPrice, max: maxUnitPrice });
@@ -1604,6 +1620,55 @@ export default function App() {
         ? currentValues.filter((entry) => entry !== value)
         : [...currentValues, value]
     );
+  }
+
+  function clearInventoryFilters() {
+    setSelectedExpiration([]);
+    setSelectedDuration([]);
+    setSelectedCategories([]);
+    setSelectedPallets([]);
+    setSelectedBoxTypes([]);
+    setSelectedWorkflowStatuses([]);
+    setShowAvailableItems(false);
+    setShowNonAvailableItems(false);
+    setValuationRange({ min: minUnitPrice, max: maxUnitPrice });
+    setSearchTerm("");
+  }
+
+  function openChartSegmentInInventory(filterType, rawLabel) {
+    clearInventoryFilters();
+    setSelectedInventoryIds([]);
+
+    if (filterType === "expiration") {
+      const expirationLabelMap = {
+        "Already Expired": "Already expired",
+        "No expiration": "No expiration date",
+        "No expiration date": "No expiration date",
+      };
+      setSelectedExpiration([expirationLabelMap[rawLabel] || rawLabel]);
+    } else if (filterType === "duration") {
+      setSelectedDuration([rawLabel]);
+    } else if (filterType === "category") {
+      setSelectedCategories([rawLabel]);
+    } else if (filterType === "box") {
+      setSelectedBoxTypes([rawLabel]);
+    } else if (filterType === "workflow") {
+      setSelectedWorkflowStatuses([rawLabel]);
+    } else if (filterType === "value") {
+      const valueRanges = {
+        "$0-$50": { min: 0, max: Math.min(49.999, maxUnitPrice) },
+        "$50-$100": { min: 50, max: Math.min(99.999, maxUnitPrice) },
+        "$100-$200": { min: 100, max: Math.min(199.999, maxUnitPrice) },
+        "$200+": { min: 200, max: maxUnitPrice },
+      };
+      setValuationRange(valueRanges[rawLabel] || { min: minUnitPrice, max: maxUnitPrice });
+    }
+
+    setActiveTab("inventory");
+    setIsInventoryFiltersOpen(false);
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
   }
 
   function openShipmentModal(selectedItems) {
@@ -2196,7 +2261,7 @@ export default function App() {
     closeDeliveredModal();
   }
 
-  const filteredInventoryRows = inventoryRowsWithStatus.filter((row) => {
+  const filteredInventoryRows = inventoryRowsWithShipmentStatus.filter((row) => {
     const matchesSearch =
       !normalizedSearch ||
       [row.generalSupply, row.exactSupplyName, row.manufacturer].some((value) =>
@@ -2213,7 +2278,8 @@ export default function App() {
       matchesSelectedFilter(selectedBoxTypes, row.boxType) &&
       matchesSelectedFilter(selectedExpiration, row.expirationFilter) &&
       matchesSelectedFilter(selectedDuration, row.durationFilter) &&
-      matchesSelectedFilter(selectedCategories, row.category)
+      matchesSelectedFilter(selectedCategories, row.category) &&
+      matchesSelectedFilter(selectedWorkflowStatuses, row.supplyWorkflowStatus)
     );
   });
   const selectedInventoryItems = filteredInventoryRows.filter((row) =>
@@ -2972,17 +3038,7 @@ export default function App() {
                   <button
                     type="button"
                     className="clear-filters"
-                    onClick={() => {
-                      setSelectedExpiration([]);
-                      setSelectedDuration([]);
-                      setSelectedCategories([]);
-                      setSelectedPallets([]);
-                      setSelectedBoxTypes([]);
-                      setShowAvailableItems(false);
-                      setShowNonAvailableItems(false);
-                      setValuationRange({ min: minUnitPrice, max: maxUnitPrice });
-                      setSearchTerm("");
-                    }}
+                    onClick={clearInventoryFilters}
                   >
                     Clear all
                   </button>
@@ -3128,6 +3184,27 @@ export default function App() {
                       checked={selectedBoxTypes.includes(option.value)}
                       onChange={() =>
                         toggleFilter(setSelectedBoxTypes, selectedBoxTypes, option.value)
+                      }
+                    />
+                    <span>{option.value}</span>
+                    <span className="filter-count">{option.count}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="filter-group">
+                <h4>Workflow Status</h4>
+                {workflowStatusOptions.map((option) => (
+                  <label key={option.value} className="filter-option">
+                    <input
+                      type="checkbox"
+                      checked={selectedWorkflowStatuses.includes(option.value)}
+                      onChange={() =>
+                        toggleFilter(
+                          setSelectedWorkflowStatuses,
+                          selectedWorkflowStatuses,
+                          option.value
+                        )
                       }
                     />
                     <span>{option.value}</span>
@@ -3336,6 +3413,9 @@ export default function App() {
                   background={expirationPieBackground}
                   activeLabel={activeExpirationPieLabel}
                   onHover={setActiveExpirationPieLabel}
+                  onSegmentClick={(segment) =>
+                    openChartSegmentInInventory("expiration", segment.label)
+                  }
                 />
               ) : (
                 <p>No expiration data is available yet.</p>
@@ -3360,6 +3440,9 @@ export default function App() {
                   background={durationPieBackground}
                   activeLabel={activeDurationPieLabel}
                   onHover={setActiveDurationPieLabel}
+                  onSegmentClick={(segment) =>
+                    openChartSegmentInInventory("duration", segment.label)
+                  }
                 />
               ) : (
                 <p>No duration data is available yet.</p>
@@ -3386,6 +3469,9 @@ export default function App() {
                   activeLabel={activeCategoryPieLabel}
                   onHover={setActiveCategoryPieLabel}
                   cardClassName="category-pie-card"
+                  onSegmentClick={(segment) =>
+                    openChartSegmentInInventory("category", segment.label)
+                  }
                 />
               ) : (
                 <p>No category data is available yet.</p>
@@ -3411,6 +3497,9 @@ export default function App() {
                   activeLabel={activeValuePieLabel}
                   onHover={setActiveValuePieLabel}
                   cardClassName="kpi-compact-card"
+                  onSegmentClick={(segment) =>
+                    openChartSegmentInInventory("value", segment.label)
+                  }
                 />
               ) : (
                 <p>No value data is available yet.</p>
@@ -3436,6 +3525,9 @@ export default function App() {
                   activeLabel={activeBoxCategoryPieLabel}
                   onHover={setActiveBoxCategoryPieLabel}
                   cardClassName="kpi-compact-card"
+                  onSegmentClick={(segment) =>
+                    openChartSegmentInInventory("box", segment.label)
+                  }
                   renderLegendDetail={(segment) =>
                     `${formatNumber(segment.value)} items • ${segment.percentage}% of raw items • ${formatNumber(segment.boxCount)} boxes`
                   }
@@ -3464,6 +3556,9 @@ export default function App() {
                   activeLabel={activeSupplyStatusPieLabel}
                   onHover={setActiveSupplyStatusPieLabel}
                   cardClassName="kpi-compact-card"
+                  onSegmentClick={(segment) =>
+                    openChartSegmentInInventory("workflow", segment.label)
+                  }
                 />
               ) : (
                 <p>No supply status data is available yet.</p>
