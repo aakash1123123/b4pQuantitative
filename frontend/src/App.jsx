@@ -2410,6 +2410,18 @@ export default function App() {
   const selectedInventoryItems = filteredInventoryRows.filter((row) =>
     selectedInventoryIds.includes(row.id)
   );
+  const hasActiveInventoryFilters =
+    searchTerm.trim().length > 0 ||
+    selectedExpiration.length > 0 ||
+    selectedDuration.length > 0 ||
+    selectedCategories.length > 0 ||
+    selectedPallets.length > 0 ||
+    selectedBoxTypes.length > 0 ||
+    selectedWorkflowStatuses.length > 0 ||
+    showAvailableItems ||
+    showNonAvailableItems ||
+    valuationRange.min !== minUnitPrice ||
+    valuationRange.max !== maxUnitPrice;
   const allFilteredSelected =
     filteredInventoryRows.length > 0 &&
     filteredInventoryRows.every((row) => selectedInventoryIds.includes(row.id));
@@ -3098,6 +3110,15 @@ export default function App() {
                 </svg>
                 Filters
               </button>
+              {hasActiveInventoryFilters ? (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={clearInventoryFilters}
+                >
+                  Clear all
+                </button>
+              ) : null}
               <button
                 ref={inventoryShipmentButtonRef}
                 type="button"
@@ -3128,6 +3149,15 @@ export default function App() {
                 </svg>
                 Filters
               </button>
+              {hasActiveInventoryFilters ? (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={clearInventoryFilters}
+                >
+                  Clear all
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="primary-button"
