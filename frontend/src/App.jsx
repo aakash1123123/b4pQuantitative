@@ -1202,6 +1202,7 @@ export default function App() {
   const [returningShipmentItem, setReturningShipmentItem] = useState(null);
   const [requestingShipmentItem, setRequestingShipmentItem] = useState(null);
   const [consolidatingShipmentItem, setConsolidatingShipmentItem] = useState(null);
+  const [bulkConsolidationCheck, setBulkConsolidationCheck] = useState(null);
   const [addingSupplyIdsShipmentId, setAddingSupplyIdsShipmentId] = useState(null);
   const [shipmentSupplyIdsInput, setShipmentSupplyIdsInput] = useState("");
   const [requestedUnitsValue, setRequestedUnitsValue] = useState("");
@@ -1790,6 +1791,33 @@ export default function App() {
 
   function closeConsolidationModal() {
     setConsolidatingShipmentItem(null);
+  }
+
+  function openBulkConsolidationModal(shipment) {
+    const shouldConsolidate = !shipment.items.every((item) => item.isConsolidated);
+    setBulkConsolidationCheck({
+      shipmentId: shipment.id,
+      shipmentName: shipment.recipientName,
+      shouldConsolidate,
+      itemCount: shipment.items.length,
+      requestedUnitCount: shipment.items.reduce(
+        (total, item) => total + normalizeRequestedQuantity(item),
+        0
+      ),
+    });
+  }
+
+  function closeBulkConsolidationModal() {
+    setBulkConsolidationCheck(null);
+  }
+
+  function confirmBulkConsolidation() {
+    if (!bulkConsolidationCheck) {
+      return;
+    }
+
+    consolidateAllShipmentItems(bulkConsolidationCheck.shipmentId);
+    closeBulkConsolidationModal();
   }
 
   function openAddSupplyIdsModal(shipmentId) {
@@ -3758,7 +3786,7 @@ export default function App() {
                           <button
                             type="button"
                             className="secondary-button"
-                            onClick={() => consolidateAllShipmentItems(shipment.id)}
+                            onClick={() => openBulkConsolidationModal(shipment)}
                             disabled={shipment.items.length === 0}
                           >
                             {shipment.items.length > 0 &&
@@ -4857,6 +4885,77 @@ export default function App() {
                 onClick={saveConsolidation}
               >
                 Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {bulkConsolidationCheck ? (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={closeBulkConsolidationModal}
+        >
+          <div
+            className="shipment-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bulk-consolidation-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">
+                  {bulkConsolidationCheck.shouldConsolidate
+                    ? "Consolidation Check"
+                    : "Unconsolidation Check"}
+                </p>
+                <h2 id="bulk-consolidation-modal-title">
+                  {bulkConsolidationCheck.shouldConsolidate
+                    ? `Have all ${formatNumber(
+                        bulkConsolidationCheck.requestedUnitCount
+                      )} requested units been consolidated?`
+                    : `Unconsolidate all ${formatNumber(
+                        bulkConsolidationCheck.itemCount
+                      )} supplies?`}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={closeBulkConsolidationModal}
+              >
+                x
+              </button>
+            </div>
+
+            <div className="shipment-modal-body">
+              <p className="modal-item-name">
+                {bulkConsolidationCheck.shouldConsolidate
+                  ? `Confirm that ${formatNumber(
+                      bulkConsolidationCheck.itemCount
+                    )} supplies for ${bulkConsolidationCheck.shipmentName} have been consolidated.`
+                  : `This will return every supply in ${bulkConsolidationCheck.shipmentName} to an unconsolidated state.`}
+              </p>
+            </div>
+
+            <div className="shipment-modal-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeBulkConsolidationModal}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={confirmBulkConsolidation}
+              >
+                {bulkConsolidationCheck.shouldConsolidate
+                  ? "Confirm Consolidation"
+                  : "Confirm Unconsolidation"}
               </button>
             </div>
           </div>
