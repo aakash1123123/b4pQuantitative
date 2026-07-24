@@ -1181,6 +1181,7 @@ export default function App() {
   const [selectedBoxTypes, setSelectedBoxTypes] = useState([]);
   const [showAvailableItems, setShowAvailableItems] = useState(false);
   const [showNonAvailableItems, setShowNonAvailableItems] = useState(false);
+  const [isInventoryFiltersOpen, setIsInventoryFiltersOpen] = useState(false);
   const [shipments, setShipments] = useState(defaultShipments);
   const [isShipmentModalOpen, setIsShipmentModalOpen] = useState(false);
   const [pendingShipmentItems, setPendingShipmentItems] = useState([]);
@@ -2837,6 +2838,18 @@ export default function App() {
             <div className="inventory-actions">
               <button
                 type="button"
+                className="secondary-button inventory-filter-button"
+                onClick={() => setIsInventoryFiltersOpen(true)}
+                aria-expanded={isInventoryFiltersOpen}
+                aria-controls="inventory-filters"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 6h16M7 12h10M10 18h4" />
+                </svg>
+                Filters
+              </button>
+              <button
+                type="button"
                 className="primary-button"
                 disabled={selectedInventoryItems.length === 0}
                 onClick={() => openShipmentModal(selectedInventoryItems)}
@@ -2848,26 +2861,49 @@ export default function App() {
           </div>
 
           <div className="inventory-layout">
-            <aside className="filters-sidebar">
-              <div className="filters-header">
-                <h3>Filter Inventory</h3>
-                <button
-                  type="button"
-                  className="clear-filters"
-                  onClick={() => {
-                    setSelectedExpiration([]);
-                    setSelectedDuration([]);
-                    setSelectedCategories([]);
-                    setSelectedPallets([]);
-                    setSelectedBoxTypes([]);
-                    setShowAvailableItems(false);
-                    setShowNonAvailableItems(false);
-                    setValuationRange({ min: minUnitPrice, max: maxUnitPrice });
-                    setSearchTerm("");
-                  }}
+            {isInventoryFiltersOpen ? (
+              <>
+                <div
+                  className="filter-drawer-backdrop"
+                  role="presentation"
+                  onClick={() => setIsInventoryFiltersOpen(false)}
+                />
+                <aside
+                  id="inventory-filters"
+                  className="filters-sidebar filter-drawer"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="inventory-filters-title"
                 >
-                  Clear all
-                </button>
+              <div className="filters-header">
+                <h3 id="inventory-filters-title">Filter Inventory</h3>
+                <div className="filters-header-actions">
+                  <button
+                    type="button"
+                    className="clear-filters"
+                    onClick={() => {
+                      setSelectedExpiration([]);
+                      setSelectedDuration([]);
+                      setSelectedCategories([]);
+                      setSelectedPallets([]);
+                      setSelectedBoxTypes([]);
+                      setShowAvailableItems(false);
+                      setShowNonAvailableItems(false);
+                      setValuationRange({ min: minUnitPrice, max: maxUnitPrice });
+                      setSearchTerm("");
+                    }}
+                  >
+                    Clear all
+                  </button>
+                  <button
+                    type="button"
+                    className="filter-drawer-close"
+                    onClick={() => setIsInventoryFiltersOpen(false)}
+                    aria-label="Close inventory filters"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
 
               <div className="search-row">
@@ -3061,7 +3097,9 @@ export default function App() {
                   ))}
                 </div>
               </div>
-            </aside>
+                </aside>
+              </>
+            ) : null}
 
             <div className="inventory-results">
               <div className="table-wrap">
