@@ -1757,6 +1757,12 @@ button.shipment-notes-copy {
   min-width: 220px;
 }
 
+.shipment-chart-cluster {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+
 .shipment-distribution-chart {
   display: flex;
   justify-content: center;
@@ -1772,7 +1778,7 @@ button.shipment-notes-copy {
 .shipment-distribution-pie::after {
   content: "";
   position: absolute;
-  inset: 26px;
+  inset: 21px;
   border-radius: 999px;
   background: #ffffff;
 }
@@ -2415,6 +2421,15 @@ button.shipment-notes-copy {
 
   .shipment-card-header {
     flex-direction: column;
+  }
+
+  .shipment-chart-cluster {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .shipment-chart-cluster .shipment-distribution-card {
+    width: 100%;
   }
 
   .shipment-card-meta {
