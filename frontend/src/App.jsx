@@ -870,6 +870,99 @@ function ShipmentDistributionChart({ shipmentItems }) {
   );
 }
 
+function ShipmentExpirationChart({ shipmentItems }) {
+  const [activeLabel, setActiveLabel] = useState(null);
+  const bucketOrder = [
+    "Already expired",
+    "0-90 days",
+    "90-180 days",
+    "180-365 days",
+    "365+ days",
+    "No expiration date",
+  ];
+  const chartData = bucketOrder
+    .map((label) => {
+      const matchingItems = shipmentItems.filter(
+        (item) =>
+          (item.expirationFilter ||
+            expirationBucket(item.expirationRaw || item.expiration_date || null)) === label
+      );
+
+      return {
+        label,
+        value: matchingItems.reduce(
+          (total, item) => total + normalizeRequestedQuantity(item),
+          0
+        ),
+        entries: matchingItems.length,
+        color: expirationBucketColors[label] || "#4a90e2",
+      };
+    })
+    .filter((segment) => segment.value > 0);
+  const totalItems = chartData.reduce((total, segment) => total + segment.value, 0);
+  const legendSegments = chartData.map((segment) => ({
+    ...segment,
+    total: totalItems,
+    percentage: percentOfTotal(segment.value, totalItems),
+  }));
+  const pieSegments = buildPieChartSegments(legendSegments);
+  const activeSegment =
+    legendSegments.find((segment) => segment.label === activeLabel) || legendSegments[0] || null;
+
+  if (!legendSegments.length) {
+    return (
+      <div className="shipment-distribution-card">
+        <span className="shipment-status-label">Expiration Summary</span>
+        <p className="shipment-distribution-empty">No expiration data yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="shipment-distribution-card">
+      <span className="shipment-status-label">Expiration Summary</span>
+      <div
+        className="shipment-distribution-chart"
+        role="img"
+        aria-label="Pie chart of shipment supplies by expiration bucket"
+        onMouseLeave={() => setActiveLabel(null)}
+      >
+        <div
+          className="shipment-distribution-pie"
+          style={{ background: buildPieChartBackground(legendSegments) }}
+        >
+          <svg className="pie-slice-layer" viewBox="0 0 200 200" aria-hidden="true">
+            {pieSegments.map((segment) => (
+              <path
+                key={segment.label}
+                d={segment.path}
+                className={
+                  (activeLabel || activeSegment?.label) === segment.label
+                    ? "pie-slice-hotspot active"
+                    : "pie-slice-hotspot"
+                }
+                onPointerEnter={() => setActiveLabel(segment.label)}
+                onPointerMove={() => setActiveLabel(segment.label)}
+              />
+            ))}
+          </svg>
+          <div className="shipment-distribution-center">
+            <strong>{formatNumber(totalItems)}</strong>
+            <span>items</span>
+          </div>
+        </div>
+      </div>
+      {activeSegment ? (
+        <div className="shipment-distribution-tooltip">
+          <strong>{activeSegment.label}</strong>
+          <span>{formatNumber(activeSegment.value)} raw item supplies</span>
+          <span>{activeSegment.percentage}% of total supplies</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function CompactPalletPieChart({ title, ariaLabel, segments, tooltipFormatter }) {
   const [activeLabel, setActiveLabel] = useState(null);
   const pieSegments = buildPieChartSegments(segments.filter((segment) => segment.value > 0));
@@ -3911,7 +4004,10 @@ export default function App() {
                             </span>
                           </div>
                         </div>
-                        <ShipmentDistributionChart shipmentItems={shipment.items} />
+                        <div className="shipment-chart-cluster">
+                          <ShipmentDistributionChart shipmentItems={shipment.items} />
+                          <ShipmentExpirationChart shipmentItems={shipment.items} />
+                        </div>
                         <div className="shipment-card-actions">
                           <button
                             type="button"
@@ -4206,7 +4302,10 @@ export default function App() {
                               <span>Delivered: {formatShipmentHistoryDate(shipment.deliveryDate)}</span>
                             </div>
                           </div>
-                          <ShipmentDistributionChart shipmentItems={shipment.items} />
+                          <div className="shipment-chart-cluster">
+                            <ShipmentDistributionChart shipmentItems={shipment.items} />
+                            <ShipmentExpirationChart shipmentItems={shipment.items} />
+                          </div>
                           <div className="shipment-status-panel shipment-status-panel-past">
                             <div className="shipment-status-column">
                               <span className="shipment-status-label">Shipment Status</span>
