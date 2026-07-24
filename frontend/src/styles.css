@@ -1613,7 +1613,7 @@ tbody tr.inventory-row-partial:hover {
   display: flex;
   align-items: flex-start;
   gap: 18px;
-  min-width: 560px;
+  min-width: 180px;
 }
 
 .shipment-status-column,
@@ -1938,6 +1938,29 @@ button.shipment-notes-copy {
   display: grid;
   gap: 10px;
   margin-top: 14px;
+}
+
+.shipment-line-items-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid #d6e4f3;
+  border-radius: 12px;
+  background: #f7fbff;
+}
+
+.shipment-line-items-filter-bar .shipment-filter-label {
+  text-align: left;
+  white-space: nowrap;
+}
+
+.shipment-line-items-filter-bar .shipment-filter-buttons {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  width: auto;
 }
 
 .shipment-line-item {

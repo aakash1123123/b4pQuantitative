@@ -3724,44 +3724,6 @@ export default function App() {
                               {getShipmentStatus(shipment)}
                             </span>
                           </div>
-                          <div className="shipment-filter-panel">
-                            <span className="shipment-filter-label">Filter Status</span>
-                            <div className="shipment-filter-buttons">
-                              <button
-                                type="button"
-                                className={
-                                  (shipment.filterMode || "original") === "original"
-                                    ? "secondary-button filter-toggle-button is-active"
-                                    : "secondary-button filter-toggle-button"
-                                }
-                                onClick={() => setShipmentFilterMode(shipment.id, "original")}
-                              >
-                                Use Add Order Filter
-                              </button>
-                              <button
-                                type="button"
-                                className={
-                                  shipment.filterMode === "location"
-                                    ? "secondary-button filter-toggle-button is-active"
-                                    : "secondary-button filter-toggle-button"
-                                }
-                                onClick={() => setShipmentFilterMode(shipment.id, "location")}
-                              >
-                                Use Location Filter
-                              </button>
-                              <button
-                                type="button"
-                                className={
-                                  shipment.filterMode === "expiration"
-                                    ? "secondary-button filter-toggle-button is-active"
-                                    : "secondary-button filter-toggle-button"
-                                }
-                                onClick={() => setShipmentFilterMode(shipment.id, "expiration")}
-                              >
-                                Use Expiration Filter
-                              </button>
-                            </div>
-                          </div>
                         </div>
                         <ShipmentDistributionChart shipmentItems={shipment.items} />
                         <div className="shipment-card-actions">
@@ -3809,6 +3771,44 @@ export default function App() {
                         <p className="shipment-empty">No items have been added yet.</p>
                       ) : expandedShipmentIds.includes(shipment.id) ? (
                         <div className="shipment-line-items">
+                          <div className="shipment-line-items-filter-bar">
+                            <span className="shipment-filter-label">Filter Supplies</span>
+                            <div className="shipment-filter-buttons">
+                              <button
+                                type="button"
+                                className={
+                                  (shipment.filterMode || "original") === "original"
+                                    ? "secondary-button filter-toggle-button is-active"
+                                    : "secondary-button filter-toggle-button"
+                                }
+                                onClick={() => setShipmentFilterMode(shipment.id, "original")}
+                              >
+                                Use Add Order Filter
+                              </button>
+                              <button
+                                type="button"
+                                className={
+                                  shipment.filterMode === "location"
+                                    ? "secondary-button filter-toggle-button is-active"
+                                    : "secondary-button filter-toggle-button"
+                                }
+                                onClick={() => setShipmentFilterMode(shipment.id, "location")}
+                              >
+                                Use Location Filter
+                              </button>
+                              <button
+                                type="button"
+                                className={
+                                  shipment.filterMode === "expiration"
+                                    ? "secondary-button filter-toggle-button is-active"
+                                    : "secondary-button filter-toggle-button"
+                                }
+                                onClick={() => setShipmentFilterMode(shipment.id, "expiration")}
+                              >
+                                Use Expiration Filter
+                              </button>
+                            </div>
+                          </div>
                           {getShipmentItemsForDisplay(shipment).map((shipmentItem) => {
                             const requestedQuantity = normalizeRequestedQuantity(shipmentItem);
                             const isRequestingAllUnits =
