@@ -1,2 +1,8 @@
-node_modules
-dist
+backend/venv/
+streamlit_app/
+frontend/node_modules/
+frontend/dist/
+__pycache__/
+*.pyc
+.env
+backend/credentials.json

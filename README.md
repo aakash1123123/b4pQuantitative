@@ -1,36 +1,40 @@
 # Inventory Management and Analytics System
 
-This repository contains a basic boilerplate for an internal inventory system with a Streamlit frontend and Python backend (FastAPI). Google Sheets is used as the initial database layer.
+This project uses a React/Vite frontend, a FastAPI backend, and Google Sheets as the inventory data source.
 
-## Structure
-```
-/streamlit_app         # Streamlit frontend code
-/backend               # Python backend (FastAPI)
-  app.py               # Main API application
-  sheets_client.py     # Placeholder for Google Sheets integration
-  utils.py             # Utility functions and KPI calculations
-  requirements.txt     # Backend dependencies
-/streamlit_app
-  app.py               # Streamlit application entrypoint
-  requirements.txt     # Frontend dependencies
-README.md
+## Project structure
+
+```text
+backend/       FastAPI application
+frontend/      React application
+api/           Serverless API entry point
 ```
 
-## Running
+The legacy `streamlit_app/` directory is not used and is ignored by Git.
+
+## Run locally
+
+Open two terminals from the repository root.
+
 ### Backend
-```bash
+
+```powershell
 cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn app:app --reload
+py -m pip install -r requirements.txt
+$env:GOOGLE_SHEETS_CREDENTIALS_PATH = (Resolve-Path ".\credentials.json")
+py -m uvicorn app:app --reload
 ```
 
-### Frontend
-```bash
-cd streamlit_app
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-streamlit run app.py
+The API is available at `http://127.0.0.1:8000` and its interactive documentation is at `http://127.0.0.1:8000/docs`.
+
+### React frontend
+
+```powershell
+cd frontend
+npm install
+npm run dev
 ```
+
+Open `http://localhost:5173`. Vite proxies the React app's `/items` and `/kpis` requests to the local FastAPI server.
+
+For a separately hosted backend, set `VITE_API_BASE` to its public URL before building the frontend.
