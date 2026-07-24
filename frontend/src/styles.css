@@ -1217,6 +1217,13 @@ table {
   min-width: 0;
 }
 
+.inventory-results input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+}
+
 .expiration-cell {
   display: grid;
   gap: 8px;
