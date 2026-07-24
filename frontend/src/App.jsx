@@ -3114,7 +3114,7 @@ export default function App() {
                           onChange={toggleSelectAllFiltered}
                         />
                       </th>
-                      <th>ID</th>
+                      <th><span className="id-column-label">ID</span></th>
                       <th>Status</th>
                       <th>General Supply</th>
                       <th>Exact Supply Name</th>
