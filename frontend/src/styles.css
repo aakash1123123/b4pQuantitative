@@ -1222,10 +1222,15 @@ table {
   font-weight: 700;
 }
 
+.availability-filter-group {
+  display: grid;
+  gap: 22px;
+  padding: 24px 0;
+}
+
 .filter-availability-toggle {
   width: 100%;
   justify-content: space-between;
-  padding: 18px 0;
 }
 
 .filters-sidebar .search-row {

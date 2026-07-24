@@ -1180,6 +1180,7 @@ export default function App() {
   const [selectedPallets, setSelectedPallets] = useState([]);
   const [selectedBoxTypes, setSelectedBoxTypes] = useState([]);
   const [showAvailableItems, setShowAvailableItems] = useState(false);
+  const [showNonAvailableItems, setShowNonAvailableItems] = useState(false);
   const [shipments, setShipments] = useState(defaultShipments);
   const [isShipmentModalOpen, setIsShipmentModalOpen] = useState(false);
   const [pendingShipmentItems, setPendingShipmentItems] = useState([]);
@@ -2147,6 +2148,7 @@ export default function App() {
       row.unitPrice >= valuationRange.min &&
       row.unitPrice <= valuationRange.max &&
       (!showAvailableItems || row.inventoryStatus === "Available") &&
+      (!showNonAvailableItems || row.inventoryStatus !== "Available") &&
       matchesSelectedFilter(selectedPallets, row.palletNumber) &&
       matchesSelectedFilter(selectedBoxTypes, row.boxType) &&
       matchesSelectedFilter(selectedExpiration, row.expirationFilter) &&
@@ -2859,6 +2861,7 @@ export default function App() {
                     setSelectedPallets([]);
                     setSelectedBoxTypes([]);
                     setShowAvailableItems(false);
+                    setShowNonAvailableItems(false);
                     setValuationRange({ min: minUnitPrice, max: maxUnitPrice });
                     setSearchTerm("");
                   }}
@@ -2881,17 +2884,37 @@ export default function App() {
                 />
               </div>
 
-              <div className="availability-toggle filter-availability-toggle">
-                <span>Show Available Items</span>
-                <button
-                  type="button"
-                  className={showAvailableItems ? "toggle-switch on" : "toggle-switch"}
-                  onClick={() => setShowAvailableItems((current) => !current)}
-                  aria-label="Show available inventory items only"
-                  aria-pressed={showAvailableItems}
-                >
-                  <span className="toggle-knob" />
-                </button>
+              <div className="availability-filter-group">
+                <div className="availability-toggle filter-availability-toggle">
+                  <span>Show Available Items</span>
+                  <button
+                    type="button"
+                    className={showAvailableItems ? "toggle-switch on" : "toggle-switch"}
+                    onClick={() => {
+                      setShowAvailableItems((current) => !current);
+                      setShowNonAvailableItems(false);
+                    }}
+                    aria-label="Show available inventory items only"
+                    aria-pressed={showAvailableItems}
+                  >
+                    <span className="toggle-knob" />
+                  </button>
+                </div>
+                <div className="availability-toggle filter-availability-toggle">
+                  <span>Show Non-Available Items</span>
+                  <button
+                    type="button"
+                    className={showNonAvailableItems ? "toggle-switch on" : "toggle-switch"}
+                    onClick={() => {
+                      setShowNonAvailableItems((current) => !current);
+                      setShowAvailableItems(false);
+                    }}
+                    aria-label="Show non-available inventory items only"
+                    aria-pressed={showNonAvailableItems}
+                  >
+                    <span className="toggle-knob" />
+                  </button>
+                </div>
               </div>
 
               <div className="filter-group">
