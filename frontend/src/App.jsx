@@ -1817,7 +1817,11 @@ export default function App() {
 
   function itemsFromSupplyIds(value) {
     const selectedIds = parseSupplyIdsInput(value);
-    return inventoryRowsWithStatus.filter((row) => selectedIds.includes(String(row.supplyId)));
+    return inventoryRowsWithStatus.filter(
+      (row) =>
+        row.inventoryStatus === "Available" &&
+        selectedIds.includes(String(row.supplyId))
+    );
   }
 
   function buildShipmentRecord(recipientName, shipmentType, pointOfContact, items = []) {
@@ -1915,16 +1919,22 @@ export default function App() {
     closeCreateShipmentModal();
   }
 
-  function toggleInventorySelection(itemId) {
+  function toggleInventorySelection(item) {
+    if (item.inventoryStatus !== "Available") {
+      return;
+    }
+
     setSelectedInventoryIds((currentIds) =>
-      currentIds.includes(itemId)
-        ? currentIds.filter((currentId) => currentId !== itemId)
-        : [...currentIds, itemId]
+      currentIds.includes(item.id)
+        ? currentIds.filter((currentId) => currentId !== item.id)
+        : [...currentIds, item.id]
     );
   }
 
   function toggleSelectAllFiltered() {
-    const filteredIds = filteredInventoryRows.map((row) => row.id);
+    const filteredIds = filteredInventoryRows
+      .filter((row) => row.inventoryStatus === "Available")
+      .map((row) => row.id);
     const allSelected =
       filteredIds.length > 0 && filteredIds.every((id) => selectedInventoryIds.includes(id));
 
@@ -2409,7 +2419,10 @@ export default function App() {
       matchesSelectedFilter(selectedWorkflowStatuses, row.supplyWorkflowStatus)
     );
   });
-  const selectedInventoryItems = filteredInventoryRows.filter((row) =>
+  const selectableFilteredInventoryRows = filteredInventoryRows.filter(
+    (row) => row.inventoryStatus === "Available"
+  );
+  const selectedInventoryItems = selectableFilteredInventoryRows.filter((row) =>
     selectedInventoryIds.includes(row.id)
   );
   const hasActiveInventoryFilters =
@@ -2425,8 +2438,8 @@ export default function App() {
     valuationRange.min !== minUnitPrice ||
     valuationRange.max !== maxUnitPrice;
   const allFilteredSelected =
-    filteredInventoryRows.length > 0 &&
-    filteredInventoryRows.every((row) => selectedInventoryIds.includes(row.id));
+    selectableFilteredInventoryRows.length > 0 &&
+    selectableFilteredInventoryRows.every((row) => selectedInventoryIds.includes(row.id));
   const normalizedShipmentSearch = shipmentSearchTerm.trim().toLowerCase();
   const currentShipmentRequestMap = currentShipments.reduce((accumulator, shipment) => {
     shipment.items.forEach((item) => {
@@ -3437,6 +3450,7 @@ export default function App() {
                           aria-label="Select all filtered inventory items"
                           checked={allFilteredSelected}
                           onChange={toggleSelectAllFiltered}
+                          disabled={selectableFilteredInventoryRows.length === 0}
                         />
                       </th>
                       <th><span className="id-column-label">ID</span></th>
@@ -3461,12 +3475,23 @@ export default function App() {
                           .join(" ") || undefined}
                       >
                         <td>
-                          <input
-                            type="checkbox"
-                            aria-label={`Select supply ${row.supplyId}`}
-                            checked={selectedInventoryIds.includes(row.id)}
-                            onChange={() => toggleInventorySelection(row.id)}
-                          />
+                          {row.inventoryStatus === "Available" ? (
+                            <input
+                              type="checkbox"
+                              aria-label={`Select supply ${row.supplyId}`}
+                              checked={selectedInventoryIds.includes(row.id)}
+                              onChange={() => toggleInventorySelection(row)}
+                            />
+                          ) : (
+                            <span
+                              className="inventory-selection-unavailable"
+                              role="img"
+                              aria-label={`${row.inventoryStatus} supply cannot be selected`}
+                              title={`${row.inventoryStatus} supplies cannot be selected again`}
+                            >
+                              ×
+                            </span>
+                          )}
                         </td>
                         <td>
                           <div className="id-cell">

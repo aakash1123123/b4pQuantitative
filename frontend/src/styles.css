@@ -1394,6 +1394,21 @@ table {
   gap: 12px;
 }
 
+.inventory-selection-unavailable {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid #9aafc4;
+  border-radius: 4px;
+  background: #eef3f8;
+  color: #617b96;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: not-allowed;
+}
+
 .floating-inventory-actions {
   position: fixed;
   top: 20px;
