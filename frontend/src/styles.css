@@ -130,6 +130,10 @@ table {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.metrics-grid-single {
+  grid-template-columns: minmax(280px, 360px);
+}
+
 .shipment-timing-grid {
   margin-top: 16px;
 }
@@ -913,6 +917,10 @@ table {
 
   .inventory-kpi-modal .inventory-kpi-modal-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metrics-grid.metrics-grid-single {
+    grid-template-columns: 1fr;
   }
 
   .shipment-kpi-grid {
