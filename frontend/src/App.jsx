@@ -1331,6 +1331,7 @@ export default function App() {
   const [activeValuePieLabel, setActiveValuePieLabel] = useState(null);
   const [activeBoxCategoryPieLabel, setActiveBoxCategoryPieLabel] = useState(null);
   const [activeSupplyStatusPieLabel, setActiveSupplyStatusPieLabel] = useState(null);
+  const [isAllInventoryKpisOpen, setIsAllInventoryKpisOpen] = useState(false);
   const [isEditingPalletMap, setIsEditingPalletMap] = useState(false);
   const [savedPalletLayout, setSavedPalletLayout] = useState({});
   const [draftPalletLayout, setDraftPalletLayout] = useState({});
@@ -3526,27 +3527,22 @@ export default function App() {
               <p className="section-label">Inventory KPIs</p>
               <h2>Current operating snapshot</h2>
             </div>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setIsAllInventoryKpisOpen(true)}
+            >
+              View all 10 KPIs
+            </button>
           </div>
 
-          <div className="metrics-grid">
+          <div className="metrics-grid metrics-grid-primary">
             <MetricCard label="Total Units On Hand" value={formatNumber(kpis.total_raw_items)} />
             <MetricCard label="Expired Units" value={formatNumber(expiredInventoryUnits)} />
             <MetricCard label="Expiring In 90 Days" value={formatNumber(expiringSoonInventoryUnits)} />
-            <MetricCard label="Slow-Moving Units" value={formatNumber(slowMovingInventoryUnits)} />
-            <MetricCard label="Assigned Units" value={formatNumber(assignedSupplyUnits)} />
             <MetricCard label="Pallet Count" value={formatNumber(kpis.pallet_count)} />
             <MetricCard label="Box Count" value={formatNumber(kpis.box_count)} />
             <MetricCard label="Avg Boxes per Pallet" value={averageBoxesPerPallet.toFixed(1)} />
-            <MetricCard
-              label="Average Duration (Days)"
-              value={(kpis.avg_duration_per_item ?? 0).toFixed(1)}
-            />
-            <MetricCard
-              label="Estimated Inventory Value"
-              value={formatCurrency(kpis.total_value)}
-              className="metric-card-wide"
-              valueClassName="metric-value-compact"
-            />
           </div>
 
           <div className="kpi-analytics-grid">
@@ -4981,6 +4977,68 @@ export default function App() {
                   tooltipFormatter={chart.tooltipFormatter}
                 />
               ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isAllInventoryKpisOpen ? (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={() => setIsAllInventoryKpisOpen(false)}
+        >
+          <div
+            className="shipment-modal inventory-kpi-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="inventory-kpi-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">Inventory KPIs</p>
+                <h2 id="inventory-kpi-modal-title">Full operating snapshot</h2>
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setIsAllInventoryKpisOpen(false)}
+                aria-label="Close full KPI view"
+              >
+                x
+              </button>
+            </div>
+
+            <div className="shipment-modal-body">
+              <div className="metrics-grid inventory-kpi-modal-grid">
+                <MetricCard label="Total Units On Hand" value={formatNumber(kpis.total_raw_items)} />
+                <MetricCard label="Expired Units" value={formatNumber(expiredInventoryUnits)} />
+                <MetricCard
+                  label="Expiring In 90 Days"
+                  value={formatNumber(expiringSoonInventoryUnits)}
+                />
+                <MetricCard
+                  label="Slow-Moving Units"
+                  value={formatNumber(slowMovingInventoryUnits)}
+                />
+                <MetricCard label="Assigned Units" value={formatNumber(assignedSupplyUnits)} />
+                <MetricCard label="Pallet Count" value={formatNumber(kpis.pallet_count)} />
+                <MetricCard label="Box Count" value={formatNumber(kpis.box_count)} />
+                <MetricCard
+                  label="Avg Boxes per Pallet"
+                  value={averageBoxesPerPallet.toFixed(1)}
+                />
+                <MetricCard
+                  label="Average Duration (Days)"
+                  value={(kpis.avg_duration_per_item ?? 0).toFixed(1)}
+                />
+                <MetricCard
+                  label="Estimated Inventory Value"
+                  value={formatCurrency(kpis.total_value)}
+                  valueClassName="metric-value-compact"
+                />
+              </div>
             </div>
           </div>
         </div>

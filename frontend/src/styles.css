@@ -126,6 +126,10 @@ table {
   gap: 16px;
 }
 
+.metrics-grid-primary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .shipment-timing-grid {
   margin-top: 16px;
 }
@@ -176,6 +180,7 @@ table {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 16px;
+  margin-top: 32px;
   margin-bottom: 20px;
 }
 
@@ -903,6 +908,10 @@ table {
 
 @media (max-width: 900px) {
   .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .inventory-kpi-modal .inventory-kpi-modal-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -2183,6 +2192,16 @@ button.shipment-notes-copy {
 
 .shipment-modal.shipment-modal-large {
   width: min(680px, 100%);
+}
+
+.inventory-kpi-modal {
+  width: min(1180px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+
+.inventory-kpi-modal-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .shipment-modal-header {
