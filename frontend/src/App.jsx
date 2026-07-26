@@ -4504,17 +4504,90 @@ export default function App() {
               <p className="section-label">Shipment KPIs</p>
               <h2>Shipment activity and outbound flow</h2>
             </div>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => setIsAllShipmentKpisOpen(true)}
-            >
-              View all 10 KPIs
-            </button>
           </div>
 
-          <div className="metrics-grid metrics-grid-single">
-            <MetricCard label="Current Shipments" value={formatNumber(currentShipments.length)} />
+          <div className="shipment-kpi-overview-split">
+            <div className="shipment-kpi-summary-pane">
+              <div className="shipment-kpi-pane-header">
+                <div>
+                  <p className="section-label">KPI Summary</p>
+                  <h3>Current shipment activity</h3>
+                </div>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => setIsAllShipmentKpisOpen(true)}
+                >
+                  View all 10 KPIs
+                </button>
+              </div>
+              <div className="metrics-grid metrics-grid-single">
+                <MetricCard
+                  label="Current Shipments"
+                  value={formatNumber(currentShipments.length)}
+                />
+              </div>
+            </div>
+
+            <div className="shipment-kpi-current-table-panel">
+              <div className="shipment-kpi-pane-header">
+                <div>
+                  <p className="section-label">Current Shipments</p>
+                  <h3>Active shipment overview</h3>
+                </div>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => {
+                    setActiveTab("shipments");
+                    setActiveShipmentSubtab("current");
+                  }}
+                >
+                  View shipments
+                </button>
+              </div>
+
+              <div className="shipment-kpi-table-wrap">
+                <table className="shipment-kpi-table">
+                  <thead>
+                    <tr>
+                      <th>Shipment</th>
+                      <th>Status</th>
+                      <th>Supplies</th>
+                      <th>Valuation</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentShipments.map((shipment) => (
+                      <tr key={shipment.id}>
+                        <td>{shipment.recipientName}</td>
+                        <td>
+                          <span className="shipment-kpi-status">
+                            {getShipmentStatus(shipment)}
+                          </span>
+                        </td>
+                        <td>{formatNumber(shipment.items.length)}</td>
+                        <td>
+                          {formatCurrency(
+                            shipment.items.reduce(
+                              (total, item) => total + requestedShipmentItemValue(item),
+                              0
+                            )
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {currentShipments.length === 0 ? (
+                      <tr>
+                        <td colSpan="4" className="empty-state-cell">
+                          No current shipments.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
           <div className="shipment-kpi-grid">
