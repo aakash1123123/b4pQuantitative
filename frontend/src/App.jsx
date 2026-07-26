@@ -508,7 +508,7 @@ const valueBucketColors = {
 const supplyStatusOrder = ["Inventory", "Pulled", "Consolidated"];
 const supplyStatusColors = {
   Inventory: "#b7c3d0",
-  Pulled: "#7aa9d8",
+  Pulled: "#0d3b6f",
   Consolidated: "#1f6f3c",
 };
 
@@ -1489,15 +1489,18 @@ export default function App() {
     const matchingShipmentItems = currentShipments.flatMap((shipment) =>
       shipment.items.filter((shipmentItem) => String(shipmentItem.id) === String(row.id))
     );
+    const supplyWorkflowStatus =
+      matchingShipmentItems.length === 0
+        ? "Inventory"
+        : matchingShipmentItems.some((shipmentItem) => shipmentItem.isConsolidated)
+          ? "Consolidated"
+          : "Pulled";
 
     return {
       ...row,
-      supplyWorkflowStatus:
-        matchingShipmentItems.length === 0
-          ? "Inventory"
-        : matchingShipmentItems.some((shipmentItem) => shipmentItem.isConsolidated)
-            ? "Consolidated"
-            : "Pulled",
+      inventoryStatus:
+        supplyWorkflowStatus === "Inventory" ? "Available" : supplyWorkflowStatus,
+      supplyWorkflowStatus,
     };
   });
   const allBoxTypes = [...new Set(inventoryRowsWithStatus.map((row) => row.boxType).filter(Boolean))].sort(
@@ -3508,9 +3511,9 @@ export default function App() {
                         <td>
                           <span
                             className={
-                              row.inventoryStatus === "Pulled"
-                                ? "status-pill pulled"
-                                : "status-pill inventory"
+                              row.inventoryStatus === "Available"
+                                ? "status-pill inventory"
+                                : `status-pill ${row.inventoryStatus.toLowerCase()}`
                             }
                           >
                             {row.inventoryStatus}
