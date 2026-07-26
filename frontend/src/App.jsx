@@ -4592,7 +4592,7 @@ export default function App() {
 
           <div className="shipment-kpi-grid">
             <div className="shipment-kpi-column">
-              <div className="summary-card">
+              <div className="summary-card shipment-mix-card">
                 <div className="panel-header">
                   <div>
                     <p className="section-label">Shipment Mix</p>
@@ -4608,7 +4608,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="summary-card">
+              <div className="summary-card shipment-status-card">
                 <div className="panel-header">
                   <div>
                     <p className="section-label">Shipment Status</p>
