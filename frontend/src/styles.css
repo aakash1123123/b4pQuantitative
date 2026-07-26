@@ -616,13 +616,85 @@ table {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
-  margin-top: 20px;
+  margin-top: 28px;
 }
 
 .shipment-kpi-column {
   display: grid;
   gap: 16px;
   align-content: start;
+}
+
+.shipment-kpi-overview-split {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(520px, 1.7fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.shipment-kpi-summary-pane,
+.shipment-kpi-current-table-panel {
+  padding: 18px;
+  border: 1px solid #d6e4f3;
+  border-radius: 18px;
+  background: #f8fbff;
+}
+
+.shipment-kpi-pane-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.shipment-kpi-pane-header h3 {
+  margin: 0;
+  color: #12365d;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.shipment-kpi-pane-header .section-label {
+  margin-bottom: 6px;
+}
+
+.shipment-kpi-table-wrap {
+  overflow-x: auto;
+}
+
+.shipment-kpi-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #15324d;
+}
+
+.shipment-kpi-table th,
+.shipment-kpi-table td {
+  padding: 12px;
+  border-bottom: 1px solid #dce8f4;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.shipment-kpi-table th {
+  color: #5c7ea3;
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shipment-kpi-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.shipment-kpi-status {
+  display: inline-flex;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #e7f1fc;
+  color: #1c5c97;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .shipment-bar-chart {
@@ -920,6 +992,10 @@ table {
   }
 
   .metrics-grid.metrics-grid-single {
+    grid-template-columns: 1fr;
+  }
+
+  .shipment-kpi-overview-split {
     grid-template-columns: 1fr;
   }
 
