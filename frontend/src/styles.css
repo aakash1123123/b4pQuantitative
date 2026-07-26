@@ -625,6 +625,14 @@ table {
   align-content: start;
 }
 
+.shipment-kpi-column .shipment-status-card {
+  order: 1;
+}
+
+.shipment-kpi-column .shipment-mix-card {
+  order: 2;
+}
+
 .shipment-kpi-overview-split {
   display: grid;
   grid-template-columns: minmax(280px, 0.8fr) minmax(520px, 1.7fr);
