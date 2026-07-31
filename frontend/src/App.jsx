@@ -3088,6 +3088,11 @@ export default function App() {
     <main className="page-shell">
       <header className="top-bar">
         <h1>Blueprints Operations Dashboard</h1>
+        <img
+          className="dashboard-logo"
+          src="/blueprints-logo.png"
+          alt="Blueprints for Pangaea"
+        />
       </header>
 
       <section className="tabs-section">
