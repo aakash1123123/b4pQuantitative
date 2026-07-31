@@ -38,6 +38,7 @@ table {
 .top-bar {
   display: flex;
   align-items: center;
+  position: relative;
   min-height: 56px;
   margin-bottom: 14px;
 }
@@ -48,6 +49,18 @@ table {
   font-size: clamp(1.6rem, 2.8vw, 2.3rem);
   line-height: 1.1;
   color: var(--brand-ink);
+}
+
+.dashboard-logo {
+  display: block;
+  position: absolute;
+  top: calc(50% + 24px);
+  right: 0;
+  width: auto;
+  height: 112px;
+  transform: translateY(-50%);
+  object-fit: contain;
+  z-index: 2;
 }
 
 .tabs-section {
@@ -2519,6 +2532,11 @@ textarea:focus-visible {
 }
 
 @media (max-width: 720px) {
+  .dashboard-logo {
+    top: 50%;
+    height: 42px;
+  }
+
   .page-shell {
     width: min(100% - 20px, 1240px);
     padding-top: 16px;
