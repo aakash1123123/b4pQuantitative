@@ -1,7 +1,13 @@
 :root {
+  --brand-medium: #0069f3;
+  --brand-dark: #0035a2;
+  --brand-light: #cbdbff;
+  --brand-ink: #000e3f;
+  --brand-secondary: #373c82;
+  --brand-white: #ffffff;
   font-family: "Source Sans 3", sans-serif;
-  color: #15324d;
-  background: linear-gradient(180deg, #f4f8fd 0%, #e9f1fb 100%);
+  color: var(--brand-ink);
+  background: linear-gradient(180deg, #f8faff 0%, var(--brand-light) 100%);
 }
 
 * {
@@ -41,7 +47,7 @@ table {
   font-family: "Space Grotesk", sans-serif;
   font-size: clamp(1.6rem, 2.8vw, 2.3rem);
   line-height: 1.1;
-  color: #0f2f57;
+  color: var(--brand-ink);
 }
 
 .tabs-section {
@@ -55,11 +61,11 @@ table {
 }
 
 .tab-button {
-  border: 1px solid #b8cde6;
+  border: 1px solid var(--brand-light);
   border-radius: 10px 10px 0 0;
   padding: 12px 20px;
-  background: #e8f0fb;
-  color: #1d4874;
+  background: #edf2ff;
+  color: var(--brand-secondary);
   cursor: pointer;
   transition: transform 120ms ease, background 120ms ease, color 120ms ease;
   font-weight: 700;
@@ -67,13 +73,13 @@ table {
 
 .tab-button:hover {
   transform: translateY(-1px);
-  background: #f7fbff;
+  background: var(--brand-light);
 }
 
 .tab-button.active {
-  background: #ffffff;
-  color: #0d3b6f;
-  border-color: #8fb4de;
+  background: var(--brand-white);
+  color: var(--brand-dark);
+  border-color: var(--brand-medium);
 }
 
 .panel,
@@ -81,9 +87,9 @@ table {
   margin-top: 0;
   padding: 24px;
   border-radius: 0 18px 18px 18px;
-  background: #ffffff;
-  border: 1px solid #cfe0f2;
-  box-shadow: 0 16px 34px rgba(29, 72, 116, 0.08);
+  background: var(--brand-white);
+  border: 1px solid var(--brand-light);
+  box-shadow: 0 16px 34px rgba(0, 14, 63, 0.1);
 }
 
 .panel-header {
@@ -100,14 +106,14 @@ table {
   letter-spacing: 0.12em;
   font-size: 0.78rem;
   font-weight: 700;
-  color: #5c7ea3;
+  color: var(--brand-secondary);
 }
 
 .panel-header h2,
 .panel-header h3 {
   margin: 0;
   font-family: "Space Grotesk", sans-serif;
-  color: #12365d;
+  color: var(--brand-ink);
 }
 
 .pill {
@@ -115,8 +121,8 @@ table {
   align-items: center;
   border-radius: 999px;
   padding: 8px 12px;
-  background: #e7f1fc;
-  color: #1c5c97;
+  background: var(--brand-light);
+  color: var(--brand-dark);
   font-weight: 700;
 }
 
@@ -145,8 +151,8 @@ table {
 .metric-card {
   padding: 18px;
   border-radius: 20px;
-  background: linear-gradient(180deg, #ffffff 0%, #f2f7fd 100%);
-  border: 1px solid rgba(26, 84, 136, 0.1);
+  background: linear-gradient(180deg, var(--brand-white) 0%, #edf2ff 100%);
+  border: 1px solid var(--brand-light);
 }
 
 .metric-card-wide {
@@ -155,7 +161,7 @@ table {
 
 .metric-label {
   margin: 0;
-  color: #5e7fa1;
+  color: var(--brand-secondary);
   font-size: 0.95rem;
 }
 
@@ -164,7 +170,7 @@ table {
   font-family: "Space Grotesk", sans-serif;
   font-size: 2rem;
   line-height: 1;
-  color: #103a66;
+  color: var(--brand-dark);
 }
 
 .metric-value-compact {
@@ -791,18 +797,18 @@ table {
 .shipment-bar-chart-bar {
   width: 100%;
   border-radius: 16px 16px 0 0;
-  background: linear-gradient(180deg, #7ab6ff 0%, #0d3b6f 100%);
+  background: linear-gradient(180deg, var(--brand-medium) 0%, var(--brand-dark) 100%);
 }
 
 .shipment-bar-chart-bar-secondary {
-  background: linear-gradient(180deg, #8fc5ff 0%, #2f66a7 100%);
+  background: linear-gradient(180deg, var(--brand-light) 0%, var(--brand-secondary) 100%);
 }
 
 .shipment-bar-chart-label {
   width: 100%;
   align-self: start;
   text-align: center;
-  color: #12365d;
+  color: var(--brand-ink);
   font-size: 0.88rem;
   line-height: 1.25;
 }
@@ -860,24 +866,24 @@ table {
 
 .shipment-line-chart-path {
   fill: none;
-  stroke: #0d3b6f;
+  stroke: var(--brand-dark);
   stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .shipment-line-chart-path-secondary {
-  stroke: #2f66a7;
+  stroke: var(--brand-secondary);
 }
 
 .shipment-line-chart-dot {
   fill: #ffffff;
-  stroke: #0d3b6f;
+  stroke: var(--brand-dark);
   stroke-width: 3;
 }
 
 .shipment-line-chart-dot-secondary {
-  stroke: #2f66a7;
+  stroke: var(--brand-secondary);
 }
 
 .shipment-line-chart-dot-hitbox {
@@ -891,7 +897,7 @@ table {
   min-width: 180px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: #12365d;
+  background: var(--brand-ink);
   color: #ffffff;
   display: grid;
   gap: 4px;
@@ -1180,7 +1186,7 @@ table {
 }
 
 .valuation-range-active {
-  background: #0d3b6f;
+  background: var(--brand-dark);
 }
 
 .valuation-range-slider input[type="range"] {
@@ -1199,7 +1205,7 @@ table {
 .valuation-range-slider input[type="range"]::-webkit-slider-thumb {
   width: 18px;
   height: 18px;
-  border: 2px solid #0d3b6f;
+  border: 2px solid var(--brand-dark);
   border-radius: 999px;
   background: #ffffff;
   cursor: pointer;
@@ -1210,7 +1216,7 @@ table {
 .valuation-range-slider input[type="range"]::-moz-range-thumb {
   width: 18px;
   height: 18px;
-  border: 2px solid #0d3b6f;
+  border: 2px solid var(--brand-dark);
   border-radius: 999px;
   background: #ffffff;
   cursor: pointer;
@@ -1308,7 +1314,7 @@ table {
 }
 
 .status-pill.pulled {
-  background: #0d3b6f;
+  background: var(--brand-dark);
   color: #ffffff;
 }
 
@@ -2464,8 +2470,8 @@ button.shipment-notes-copy {
 }
 
 .primary-button {
-  border: 1px solid #0d3b6f;
-  background: #0d3b6f;
+  border: 1px solid var(--brand-dark);
+  background: var(--brand-dark);
   color: #ffffff;
 }
 
@@ -2475,9 +2481,26 @@ button.shipment-notes-copy {
 }
 
 .secondary-button {
-  border: 1px solid #c2d7ee;
-  background: #eef5fd;
-  color: #24517d;
+  border: 1px solid var(--brand-light);
+  background: #edf2ff;
+  color: var(--brand-dark);
+}
+
+.primary-button:hover:not(:disabled) {
+  background: var(--brand-medium);
+  border-color: var(--brand-medium);
+}
+
+.secondary-button:hover:not(:disabled) {
+  background: var(--brand-light);
+  border-color: var(--brand-medium);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline-color: var(--brand-medium);
 }
 
 .secondary-button:disabled {
