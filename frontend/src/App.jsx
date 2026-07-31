@@ -483,18 +483,18 @@ const durationBucketOrder = [
 ];
 
 const categoryPiePalette = [
-  "#0d3b6f",
-  "#1f5f99",
-  "#2f7db6",
-  "#4b95c9",
-  "#6aaed6",
-  "#8bc2df",
-  "#4b6785",
-  "#5d7c9d",
-  "#7a96b2",
-  "#98b0c6",
-  "#b6cad9",
-  "#d2e0eb",
+  "#000e3f",
+  "#0035a2",
+  "#0069f3",
+  "#373c82",
+  "#7699e7",
+  "#cbdbff",
+  "#001b68",
+  "#3159b8",
+  "#6688d6",
+  "#9bb5ed",
+  "#b7caff",
+  "#e4ebff",
 ];
 
 const valueBucketOrder = ["$0-$50", "$50-$100", "$100-$200", "$200+"];
@@ -507,18 +507,18 @@ const valueBucketColors = {
 
 const supplyStatusOrder = ["Inventory", "Pulled", "Consolidated"];
 const supplyStatusColors = {
-  Inventory: "#b7c3d0",
-  Pulled: "#0d3b6f",
+  Inventory: "#cbdbff",
+  Pulled: "#0035a2",
   Consolidated: "#1f6f3c",
 };
 
 const boxCategoryPalette = [
-  "#0d3b6f",
-  "#2f7db6",
-  "#6aaed6",
-  "#8bc2df",
-  "#98b0c6",
-  "#4b6785",
+  "#000e3f",
+  "#0035a2",
+  "#0069f3",
+  "#373c82",
+  "#7699e7",
+  "#cbdbff",
 ];
 
 function valueBucketForUnitPrice(unitPrice) {
