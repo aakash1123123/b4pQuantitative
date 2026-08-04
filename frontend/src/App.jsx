@@ -1273,6 +1273,7 @@ function ShipmentItemsLineChart({ points, xAxisEndLabel, onSelectShipment }) {
 export default function App() {
   const [activeTab, setActiveTab] = useState("inventory");
   const [activeShipmentSubtab, setActiveShipmentSubtab] = useState("current");
+  const [activeShipmentKpiSubtab, setActiveShipmentKpiSubtab] = useState("overview");
   const [items, setItems] = useState([]);
   const [kpis, setKpis] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1343,6 +1344,7 @@ export default function App() {
   const [activeSupplyStatusPieLabel, setActiveSupplyStatusPieLabel] = useState(null);
   const [isAllInventoryKpisOpen, setIsAllInventoryKpisOpen] = useState(false);
   const [isAllShipmentKpisOpen, setIsAllShipmentKpisOpen] = useState(false);
+  const [isAllShipmentFlowMetricsOpen, setIsAllShipmentFlowMetricsOpen] = useState(false);
   const [isEditingPalletMap, setIsEditingPalletMap] = useState(false);
   const [savedPalletLayout, setSavedPalletLayout] = useState({});
   const [draftPalletLayout, setDraftPalletLayout] = useState({});
@@ -4722,6 +4724,33 @@ export default function App() {
             </div>
           </div>
 
+          <div className="shipment-subtabs shipment-kpi-subtabs" role="tablist" aria-label="Shipment KPI views">
+            <button
+              type="button"
+              className={
+                activeShipmentKpiSubtab === "overview"
+                  ? "shipment-subtab active"
+                  : "shipment-subtab"
+              }
+              onClick={() => setActiveShipmentKpiSubtab("overview")}
+            >
+              Shipment Activity
+            </button>
+            <button
+              type="button"
+              className={
+                activeShipmentKpiSubtab === "flow-time"
+                  ? "shipment-subtab active"
+                  : "shipment-subtab"
+              }
+              onClick={() => setActiveShipmentKpiSubtab("flow-time")}
+            >
+              Shipment Flow Time
+            </button>
+          </div>
+
+          {activeShipmentKpiSubtab === "overview" ? (
+            <>
           <div className="shipment-kpi-overview-split">
             <div className="shipment-kpi-summary-pane">
               <div className="shipment-kpi-pane-header">
@@ -4885,23 +4914,36 @@ export default function App() {
               </div>
             </div>
           </div>
+            </>
+          ) : null}
 
+          {activeShipmentKpiSubtab === "flow-time" ? (
+            <div className="shipment-flow-time-view">
           <div className="panel-header shipment-flow-metrics-header">
             <div>
               <p className="section-label">Shipment flow time metrics</p>
               <h3>Shipment flow time metrics</h3>
             </div>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setIsAllShipmentFlowMetricsOpen(true)}
+            >
+              View all 10 KPIs
+            </button>
           </div>
 
-          <div className="metrics-grid shipment-timing-grid">
-            {shipmentTimingMetrics.map((metric) => (
+          <div className="metrics-grid shipment-timing-grid shipment-timing-summary-grid">
+            {shipmentTimingMetrics
+              .filter((metric) => metric.label !== "Avg Consolidation Time")
+              .map((metric) => (
               <MetricCard
                 key={`${metric.scope}-${metric.label}`}
                 label={`${metric.scope} ${metric.label}`}
                 value={formatAverageDays(metric.value)}
                 valueClassName="metric-value-compact"
               />
-            ))}
+              ))}
           </div>
 
           <div className="kpi-note-card">
@@ -4911,6 +4953,8 @@ export default function App() {
               added to the shipment data model.
             </p>
           </div>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -5483,6 +5527,50 @@ export default function App() {
                   label="Near-Expiry Units In Shipments"
                   value={formatNumber(nearExpiryShipmentUnits)}
                 />
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isAllShipmentFlowMetricsOpen ? (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={() => setIsAllShipmentFlowMetricsOpen(false)}
+        >
+          <div
+            className="shipment-modal inventory-kpi-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shipment-flow-metrics-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">Shipment Flow Time Metrics</p>
+                <h2 id="shipment-flow-metrics-modal-title">All 10 flow-time metrics</h2>
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setIsAllShipmentFlowMetricsOpen(false)}
+                aria-label="Close full shipment flow-time metric view"
+              >
+                x
+              </button>
+            </div>
+
+            <div className="shipment-modal-body">
+              <div className="metrics-grid inventory-kpi-modal-grid">
+                {shipmentTimingMetrics.map((metric) => (
+                  <MetricCard
+                    key={`${metric.scope}-${metric.label}`}
+                    label={`${metric.scope} ${metric.label}`}
+                    value={formatAverageDays(metric.value)}
+                    valueClassName="metric-value-compact"
+                  />
+                ))}
               </div>
             </div>
           </div>

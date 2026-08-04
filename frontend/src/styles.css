@@ -157,8 +157,24 @@ table {
   margin-top: 16px;
 }
 
+.shipment-timing-summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .shipment-flow-metrics-header {
-  margin-top: 24px;
+  margin-top: 0;
+}
+
+.shipment-kpi-subtabs {
+  margin-top: 4px;
+  margin-bottom: 24px;
+}
+
+.shipment-flow-time-view {
+  padding: 22px;
+  border: 1px solid var(--brand-light);
+  border-radius: 18px;
+  background: #f8fbff;
 }
 
 .metric-card {
@@ -1015,6 +1031,10 @@ table {
   }
 
   .inventory-kpi-modal .inventory-kpi-modal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .shipment-timing-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
