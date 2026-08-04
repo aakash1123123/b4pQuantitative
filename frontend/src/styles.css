@@ -681,6 +681,7 @@ table {
   border: 1px solid #d6e4f3;
   border-radius: 18px;
   background: #f8fbff;
+  align-self: start;
 }
 
 .shipment-kpi-pane-header {
@@ -703,6 +704,8 @@ table {
 
 .shipment-kpi-table-wrap {
   overflow-x: auto;
+  max-height: 360px;
+  overflow-y: auto;
 }
 
 .shipment-kpi-table {
@@ -724,6 +727,10 @@ table {
   font-size: 0.76rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #ffffff;
 }
 
 .shipment-kpi-table tbody tr:last-child td {
