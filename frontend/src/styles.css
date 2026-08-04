@@ -1746,6 +1746,20 @@ tbody tr.inventory-row-partial:hover {
   color: #5c7ea3;
 }
 
+.non-inventory-filter-bar {
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.non-inventory-filter-bar .search-input {
+  flex: 1 1 420px;
+}
+
+.non-inventory-filter-bar .shipment-filter-select:last-child {
+  flex-basis: 260px;
+}
+
 .non-inventory-shipment-list {
   display: grid;
   grid-template-columns: 1fr;

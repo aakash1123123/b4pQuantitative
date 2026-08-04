@@ -1304,6 +1304,9 @@ export default function App() {
   const [currentShipmentStatusFilter, setCurrentShipmentStatusFilter] = useState("All");
   const [pastShipmentTypeFilter, setPastShipmentTypeFilter] = useState("All");
   const [pastShipmentStatusDateFilter, setPastShipmentStatusDateFilter] = useState("creation");
+  const [nonInventoryShipmentSearch, setNonInventoryShipmentSearch] = useState("");
+  const [nonInventoryShipmentLocation, setNonInventoryShipmentLocation] = useState("All");
+  const [nonInventoryValuationSort, setNonInventoryValuationSort] = useState("high-low");
   const [isCreateShipmentModalOpen, setIsCreateShipmentModalOpen] = useState(false);
   const [isNonInventoryShipmentModalOpen, setIsNonInventoryShipmentModalOpen] = useState(false);
   const [nonInventoryClinicName, setNonInventoryClinicName] = useState("");
@@ -2546,6 +2549,23 @@ export default function App() {
 
     return matchesType && matchesStatus;
   });
+  const normalizedNonInventorySearch = nonInventoryShipmentSearch.trim().toLowerCase();
+  const filteredNonInventoryShipments = nonInventoryShipments
+    .filter((shipment) => {
+      const matchesName =
+        !normalizedNonInventorySearch ||
+        shipment.clinicName.toLowerCase().includes(normalizedNonInventorySearch);
+      const matchesLocation =
+        nonInventoryShipmentLocation === "All" ||
+        normalizeShipmentType(shipment.shipmentType) === nonInventoryShipmentLocation;
+
+      return matchesName && matchesLocation;
+    })
+    .sort((left, right) =>
+      nonInventoryValuationSort === "low-high"
+        ? Number(left.valuation) - Number(right.valuation)
+        : Number(right.valuation) - Number(left.valuation)
+    );
   const rankedPastShipments = rankShipmentsBySearch(pastShipments, normalizedShipmentSearch);
   const filteredPastShipments = rankedPastShipments
     .filter((shipment) =>
@@ -4411,13 +4431,41 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-                {nonInventoryShipments.length === 0 ? (
+                <div className="create-shipment-bar non-inventory-filter-bar">
+                  <input
+                    className="search-input"
+                    type="text"
+                    value={nonInventoryShipmentSearch}
+                    onChange={(event) => setNonInventoryShipmentSearch(event.target.value)}
+                    placeholder="Search shipment or clinic names"
+                  />
+                  <select
+                    className="shipment-filter-select"
+                    value={nonInventoryShipmentLocation}
+                    onChange={(event) => setNonInventoryShipmentLocation(event.target.value)}
+                  >
+                    <option value="All">Location: All</option>
+                    <option value="Local">Location: Local</option>
+                    <option value="International">Location: International</option>
+                  </select>
+                  <select
+                    className="shipment-filter-select"
+                    value={nonInventoryValuationSort}
+                    onChange={(event) => setNonInventoryValuationSort(event.target.value)}
+                  >
+                    <option value="high-low">Valuation: Highest to Lowest</option>
+                    <option value="low-high">Valuation: Lowest to Highest</option>
+                  </select>
+                </div>
+                {filteredNonInventoryShipments.length === 0 ? (
                   <p className="non-inventory-empty">
-                    No non-inventory shipments have been documented yet.
+                    {nonInventoryShipments.length === 0
+                      ? "No non-inventory shipments have been documented yet."
+                      : "No non-inventory shipments matched those filters."}
                   </p>
                 ) : (
                   <div className="non-inventory-shipment-list">
-                    {nonInventoryShipments.map((shipment) => (
+                    {filteredNonInventoryShipments.map((shipment) => (
                       <article className="non-inventory-shipment-card" key={shipment.id}>
                         <div className="non-inventory-shipment-card-title">
                           <p className="section-label">Non-Inventory Shipment</p>
