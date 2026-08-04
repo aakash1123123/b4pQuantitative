@@ -1700,6 +1700,107 @@ tbody tr.inventory-row-partial:hover {
   flex-wrap: wrap;
 }
 
+.non-inventory-create-button {
+  white-space: nowrap;
+}
+
+.non-inventory-shipments-section {
+  margin: 0;
+  padding: 18px;
+  border: 1px solid var(--brand-light);
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.non-inventory-shipments-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.non-inventory-shipments-heading h3,
+.non-inventory-shipment-card h3 {
+  margin: 4px 0 0;
+  color: var(--brand-ink);
+}
+
+.non-inventory-heading-actions > span {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--brand-light);
+  color: var(--brand-dark);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.non-inventory-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.non-inventory-empty {
+  margin: 0;
+  color: #5c7ea3;
+}
+
+.non-inventory-shipment-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.non-inventory-shipment-card {
+  padding: 16px;
+  border: 1px solid #c2d7ee;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.non-inventory-shipment-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0 0;
+}
+
+.non-inventory-shipment-details div {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.non-inventory-shipment-details dt {
+  color: #5c7ea3;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.non-inventory-shipment-details dd {
+  margin: 5px 0 0;
+  color: var(--brand-ink);
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .non-inventory-shipments-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .non-inventory-heading-actions {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .non-inventory-shipment-details {
+    grid-template-columns: 1fr;
+  }
+}
+
 .create-shipment-bar input {
   flex: 1 1 auto;
   padding: 12px 14px;
