@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 const SHIPMENT_STORAGE_KEY = "blueprints-current-shipments";
+const NON_INVENTORY_SHIPMENT_STORAGE_KEY = "blueprints-non-inventory-shipments";
 const PALLET_MAP_STORAGE_KEY = "blueprints-pallet-map-layout";
 const PALLET_MAP_DIMENSIONS = { width: 1520, height: 1120 };
 const PALLET_CARD_SIZE = { width: 198, height: 198 };
@@ -1288,6 +1289,7 @@ export default function App() {
   const [isInventoryFiltersOpen, setIsInventoryFiltersOpen] = useState(false);
   const [showFloatingInventoryAction, setShowFloatingInventoryAction] = useState(false);
   const [shipments, setShipments] = useState(defaultShipments);
+  const [nonInventoryShipments, setNonInventoryShipments] = useState([]);
   const [isShipmentModalOpen, setIsShipmentModalOpen] = useState(false);
   const [pendingShipmentItems, setPendingShipmentItems] = useState([]);
   const [selectedShipmentId, setSelectedShipmentId] = useState("__new__");
@@ -1303,6 +1305,11 @@ export default function App() {
   const [pastShipmentTypeFilter, setPastShipmentTypeFilter] = useState("All");
   const [pastShipmentStatusDateFilter, setPastShipmentStatusDateFilter] = useState("creation");
   const [isCreateShipmentModalOpen, setIsCreateShipmentModalOpen] = useState(false);
+  const [isNonInventoryShipmentModalOpen, setIsNonInventoryShipmentModalOpen] = useState(false);
+  const [nonInventoryClinicName, setNonInventoryClinicName] = useState("");
+  const [nonInventoryPointOfContact, setNonInventoryPointOfContact] = useState("");
+  const [nonInventoryShipmentType, setNonInventoryShipmentType] = useState("Local");
+  const [nonInventoryValuation, setNonInventoryValuation] = useState("");
   const [detailsItem, setDetailsItem] = useState(null);
   const [returningShipmentItem, setReturningShipmentItem] = useState(null);
   const [returningShipmentItems, setReturningShipmentItems] = useState(null);
@@ -1444,6 +1451,31 @@ export default function App() {
       console.error("Unable to persist shipments", err);
     }
   }, [shipments]);
+
+  useEffect(() => {
+    try {
+      const storedShipments = window.localStorage.getItem(NON_INVENTORY_SHIPMENT_STORAGE_KEY);
+      if (storedShipments) {
+        const parsedShipments = JSON.parse(storedShipments);
+        if (Array.isArray(parsedShipments)) {
+          setNonInventoryShipments(parsedShipments);
+        }
+      }
+    } catch (err) {
+      console.error("Unable to restore non-inventory shipments", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        NON_INVENTORY_SHIPMENT_STORAGE_KEY,
+        JSON.stringify(nonInventoryShipments)
+      );
+    } catch (err) {
+      console.error("Unable to persist non-inventory shipments", err);
+    }
+  }, [nonInventoryShipments]);
 
   useEffect(() => {
     try {
@@ -1807,6 +1839,45 @@ export default function App() {
     setNewShipmentType("Local");
     setNewShipmentPointOfContact("");
     setNewShipmentSupplyIds("");
+  }
+
+  function openNonInventoryShipmentModal() {
+    setNonInventoryClinicName("");
+    setNonInventoryPointOfContact("");
+    setNonInventoryShipmentType("Local");
+    setNonInventoryValuation("");
+    setIsNonInventoryShipmentModalOpen(true);
+  }
+
+  function closeNonInventoryShipmentModal() {
+    setIsNonInventoryShipmentModalOpen(false);
+    setNonInventoryClinicName("");
+    setNonInventoryPointOfContact("");
+    setNonInventoryShipmentType("Local");
+    setNonInventoryValuation("");
+  }
+
+  function createNonInventoryShipment() {
+    const clinicName = nonInventoryClinicName.trim();
+    const pointOfContact = nonInventoryPointOfContact.trim();
+    const valuation = Number(nonInventoryValuation);
+
+    if (!clinicName || !pointOfContact || nonInventoryValuation === "" || valuation < 0) {
+      return;
+    }
+
+    setNonInventoryShipments((currentShipments) => [
+      ...currentShipments,
+      {
+        id: `non-inventory-shipment-${Date.now()}`,
+        clinicName,
+        pointOfContact,
+        shipmentType: normalizeShipmentType(nonInventoryShipmentType),
+        valuation,
+        createdAt: todayIsoDate(),
+      },
+    ]);
+    closeNonInventoryShipmentModal();
   }
 
   function parseSupplyIdsInput(value) {
@@ -3844,6 +3915,17 @@ export default function App() {
             <button
               type="button"
               className={
+                activeShipmentSubtab === "non-inventory"
+                  ? "shipment-subtab active"
+                  : "shipment-subtab"
+              }
+              onClick={() => setActiveShipmentSubtab("non-inventory")}
+            >
+              Non-Inventory Shipments
+            </button>
+            <button
+              type="button"
+              className={
                 activeShipmentSubtab === "past"
                   ? "shipment-subtab active"
                   : "shipment-subtab"
@@ -4307,6 +4389,59 @@ export default function App() {
                   ))}
                 </div>
               )}
+            </div>
+          ) : null}
+
+          {activeShipmentSubtab === "non-inventory" ? (
+            <div className="shipment-subpanel">
+              <section className="non-inventory-shipments-section">
+                <div className="non-inventory-shipments-heading">
+                  <div>
+                    <p className="section-label">Non-Inventory Shipments</p>
+                    <h3>Document shipments outside inventory</h3>
+                  </div>
+                  <div className="non-inventory-heading-actions">
+                    <span>{nonInventoryShipments.length} documented</span>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={openNonInventoryShipmentModal}
+                    >
+                      Create Non-Inventory Shipment
+                    </button>
+                  </div>
+                </div>
+                {nonInventoryShipments.length === 0 ? (
+                  <p className="non-inventory-empty">
+                    No non-inventory shipments have been documented yet.
+                  </p>
+                ) : (
+                  <div className="non-inventory-shipment-list">
+                    {nonInventoryShipments.map((shipment) => (
+                      <article className="non-inventory-shipment-card" key={shipment.id}>
+                        <div className="non-inventory-shipment-card-title">
+                          <p className="section-label">Non-Inventory Shipment</p>
+                          <h3>{shipment.clinicName}</h3>
+                        </div>
+                        <dl className="non-inventory-shipment-details">
+                          <div>
+                            <dt>Blueprints Point of Contact</dt>
+                            <dd>{shipment.pointOfContact}</dd>
+                          </div>
+                          <div>
+                            <dt>Shipment Type</dt>
+                            <dd>{shipment.shipmentType}</dd>
+                          </div>
+                          <div>
+                            <dt>Valuation</dt>
+                            <dd>{formatCurrency(shipment.valuation)}</dd>
+                          </div>
+                        </dl>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
             </div>
           ) : null}
 
@@ -5029,6 +5164,90 @@ export default function App() {
                 disabled={!shipmentDetailsComplete}
               >
                 Create Shipment
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isNonInventoryShipmentModalOpen ? (
+        <div className="modal-backdrop" role="presentation" onClick={closeNonInventoryShipmentModal}>
+          <div
+            className="shipment-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="non-inventory-shipment-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">Non-Inventory Shipment</p>
+                <h2 id="non-inventory-shipment-modal-title">Document shipment details</h2>
+              </div>
+              <button type="button" className="modal-close" onClick={closeNonInventoryShipmentModal}>
+                x
+              </button>
+            </div>
+
+            <div className="shipment-modal-body">
+              <label className="modal-field">
+                <span>Clinic Name</span>
+                <input
+                  type="text"
+                  value={nonInventoryClinicName}
+                  onChange={(event) => setNonInventoryClinicName(event.target.value)}
+                  placeholder="Enter clinic name"
+                />
+              </label>
+              <label className="modal-field">
+                <span>Blueprints for Pangaea Point of Contact</span>
+                <input
+                  type="text"
+                  value={nonInventoryPointOfContact}
+                  onChange={(event) => setNonInventoryPointOfContact(event.target.value)}
+                  placeholder="Enter point of contact"
+                />
+              </label>
+              <label className="modal-field">
+                <span>Shipment Type</span>
+                <select
+                  value={nonInventoryShipmentType}
+                  onChange={(event) => setNonInventoryShipmentType(event.target.value)}
+                >
+                  {shipmentTypeOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="modal-field">
+                <span>Valuation of Items</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={nonInventoryValuation}
+                  onChange={(event) => setNonInventoryValuation(event.target.value)}
+                  placeholder="0.00"
+                />
+              </label>
+            </div>
+
+            <div className="shipment-modal-actions">
+              <button type="button" className="secondary-button" onClick={closeNonInventoryShipmentModal}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={createNonInventoryShipment}
+                disabled={
+                  !nonInventoryClinicName.trim() ||
+                  !nonInventoryPointOfContact.trim() ||
+                  nonInventoryValuation === "" ||
+                  Number(nonInventoryValuation) < 0
+                }
+              >
+                Document Shipment
               </button>
             </div>
           </div>
