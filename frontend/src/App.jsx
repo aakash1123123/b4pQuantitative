@@ -36,6 +36,18 @@ const defaultShipments = [
 
 const shipmentTypeOptions = ["Local", "International"];
 const transportTypeOptions = ["Car", "Boat", "Plane", "Other"];
+const blueprintsRosterNames = [
+  "Ben Rathi", "James Ha", "Elliane Siebert", "Anurag Bolneni", "Sana Shah",
+  "Hadi Juratli", "Grant Veldhuis", "Maya Nassif", "Aakash Gummidela", "Romel Patel",
+  "Liya Berry", "Rahul Nanwani", "Katelyn Knickerbocker", "Rohan Kolli", "Belinda Chang",
+  "Amy Mui", "Sania Azhar", "Farhan Ibrahim", "Sahran Hassan", "Russell Day", "Mia Zhong",
+  "Jia Anand", "Aditya Chada", "Grisham Halapeti", "Timothy Jho", "Aisha Tokovic",
+  "Ajan Arora", "Philip Hadiwidjaja", "Jacqueline Suarez", "Lasya Kolli", "Rishi Garigipati",
+  "Samaria Noel", "Rajas Visal", "Vishnav Ramesh", "Stacey Liu", "Yug Patel", "LolaRose Song",
+  "Anjali Kakarla", "Arnav Akhaury", "Caleb Knickerbocker", "Navya Yerrapu", "Addison Richmond",
+  "Ritvik Sampath", "Allison Mack", "Max Hampel", "Devarshi Dalal", "Yusuf Halilovic",
+  "Missole Doe", "Divya Balaji", "Lexy Aguirre",
+];
 
 function normalizeShipmentType(value) {
   return value === "National" ? "International" : value || "Local";
@@ -1886,7 +1898,12 @@ export default function App() {
     const pointOfContact = nonInventoryPointOfContact.trim();
     const valuation = Number(nonInventoryValuation);
 
-    if (!clinicName || !pointOfContact || nonInventoryValuation === "" || valuation < 0) {
+    if (
+      !clinicName ||
+      !blueprintsRosterNames.includes(pointOfContact) ||
+      nonInventoryValuation === "" ||
+      valuation < 0
+    ) {
       return;
     }
 
@@ -1968,7 +1985,7 @@ export default function App() {
         const pointOfContact = newShipmentPointOfContact.trim();
         const recipientPointOfContact = newShipmentRecipientPointOfContact.trim() || "TBD";
 
-        if (!recipientName || !shipmentType || !pointOfContact) {
+        if (!recipientName || !shipmentType || !blueprintsRosterNames.includes(pointOfContact)) {
           return currentShipments;
         }
 
@@ -2015,7 +2032,7 @@ export default function App() {
     const recipientPointOfContact = newShipmentRecipientPointOfContact.trim() || "TBD";
     const shipmentItems = itemsFromSupplyIds(newShipmentSupplyIds);
 
-    if (!recipientName || !shipmentType || !pointOfContact) {
+    if (!recipientName || !shipmentType || !blueprintsRosterNames.includes(pointOfContact)) {
       return;
     }
 
@@ -2165,6 +2182,10 @@ export default function App() {
 
         if (field === "shipmentType") {
           return { ...shipment, shipmentType: normalizeShipmentType(rawValue) };
+        }
+
+        if (field === "pointOfContact" && !blueprintsRosterNames.includes(nextValue)) {
+          return shipment;
         }
 
         if (!nextValue) {
@@ -2638,7 +2659,7 @@ export default function App() {
   const shipmentDetailsComplete =
     newShipmentRecipientName.trim() &&
     newShipmentType &&
-    newShipmentPointOfContact.trim();
+    blueprintsRosterNames.includes(newShipmentPointOfContact);
   const consolidationTargetItem = consolidatingShipmentItem?.shipmentItem || null;
   const consolidationRequestedQuantity = consolidationTargetItem
     ? normalizeRequestedQuantity(consolidationTargetItem)
@@ -4087,9 +4108,8 @@ export default function App() {
                             <div className="shipment-inline-edit">
                               {editingShipmentField?.shipmentId === shipment.id &&
                               editingShipmentField?.field === "recipientName" ? (
-                                <input
-                                  className="shipment-inline-input"
-                                  type="text"
+                                <select
+                                  className="shipment-inline-select"
                                   value={editingShipmentValue}
                                   onChange={(event) => setEditingShipmentValue(event.target.value)}
                                   onBlur={saveEditingShipmentField}
@@ -4102,7 +4122,12 @@ export default function App() {
                                     }
                                   }}
                                   autoFocus
-                                />
+                                >
+                                  <option value="" disabled>Select roster member</option>
+                                  {blueprintsRosterNames.map((name) => (
+                                    <option key={name} value={name}>{name}</option>
+                                  ))}
+                                </select>
                               ) : (
                                 <h3>{shipment.recipientName}</h3>
                               )}
@@ -5128,12 +5153,15 @@ export default function App() {
                   </label>
                   <label className="modal-field">
                     <span>Blueprints Point of Contact</span>
-                    <input
-                      type="text"
+                    <select
                       value={newShipmentPointOfContact}
                       onChange={(event) => setNewShipmentPointOfContact(event.target.value)}
-                      placeholder="Enter point of contact"
-                    />
+                    >
+                      <option value="" disabled>Select active roster member</option>
+                      {blueprintsRosterNames.map((name) => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
                   </label>
                   <label className="modal-field">
                     <span className="modal-field-header">
@@ -5343,12 +5371,15 @@ export default function App() {
               </label>
               <label className="modal-field">
                 <span>Blueprints Point of Contact</span>
-                <input
-                  type="text"
+                <select
                   value={newShipmentPointOfContact}
                   onChange={(event) => setNewShipmentPointOfContact(event.target.value)}
-                  placeholder="Enter point of contact"
-                />
+                >
+                  <option value="" disabled>Select active roster member</option>
+                  {blueprintsRosterNames.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
               </label>
               <label className="modal-field">
                 <span className="modal-field-header">
@@ -5431,12 +5462,15 @@ export default function App() {
               </label>
               <label className="modal-field">
                 <span>Blueprints for Pangaea Point of Contact</span>
-                <input
-                  type="text"
+                <select
                   value={nonInventoryPointOfContact}
                   onChange={(event) => setNonInventoryPointOfContact(event.target.value)}
-                  placeholder="Enter point of contact"
-                />
+                >
+                  <option value="" disabled>Select active roster member</option>
+                  {blueprintsRosterNames.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
               </label>
               <label className="modal-field">
                 <span>Shipment Type</span>
@@ -5472,7 +5506,7 @@ export default function App() {
                 onClick={createNonInventoryShipment}
                 disabled={
                   !nonInventoryClinicName.trim() ||
-                  !nonInventoryPointOfContact.trim() ||
+                  !blueprintsRosterNames.includes(nonInventoryPointOfContact) ||
                   nonInventoryValuation === "" ||
                   Number(nonInventoryValuation) < 0
                 }
