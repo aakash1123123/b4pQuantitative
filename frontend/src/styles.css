@@ -705,7 +705,7 @@ table {
 }
 
 .shipment-kpi-table-wrap {
-  overflow-x: auto;
+  overflow-x: hidden;
   max-height: 360px;
   overflow-y: auto;
 }
@@ -747,6 +747,21 @@ table {
   color: #1c5c97;
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.shipment-kpi-status-planning {
+  background: #e7f1fc;
+  color: #1c5c97;
+}
+
+.shipment-kpi-status-consolidating {
+  background: #f6c344;
+  color: #5f4300;
+}
+
+.shipment-kpi-status-consolidation-complete {
+  background: #1f6f3c;
+  color: #ffffff;
 }
 
 .shipment-bar-chart {

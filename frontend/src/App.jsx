@@ -4934,12 +4934,16 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {currentShipments.map((shipment) => (
+                    {currentShipments.map((shipment) => {
+                      const shipmentStatus = getShipmentStatus(shipment);
+                      const shipmentStatusClass = shipmentStatus.toLowerCase().replace(/\s+/g, "-");
+
+                      return (
                       <tr key={shipment.id}>
                         <td>{shipment.recipientName}</td>
                         <td>
-                          <span className="shipment-kpi-status">
-                            {getShipmentStatus(shipment)}
+                          <span className={`shipment-kpi-status shipment-kpi-status-${shipmentStatusClass}`}>
+                            {shipmentStatus}
                           </span>
                         </td>
                         <td>{formatNumber(shipment.items.length)}</td>
@@ -4952,7 +4956,8 @@ export default function App() {
                           )}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                     {currentShipments.length === 0 ? (
                       <tr>
                         <td colSpan="4" className="empty-state-cell">
