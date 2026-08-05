@@ -4373,22 +4373,34 @@ export default function App() {
                               <span className="shipment-inline-label">Blueprints PoC:</span>
                               {editingShipmentField?.shipmentId === shipment.id &&
                               editingShipmentField?.field === "pointOfContact" ? (
-                                <input
-                                  className="shipment-inline-input"
-                                  type="text"
+                                <select
+                                  className="shipment-inline-select"
                                   value={editingShipmentValue}
-                                  onChange={(event) => setEditingShipmentValue(event.target.value)}
-                                  onBlur={saveEditingShipmentField}
+                                  title="Select a Blueprints point of contact"
+                                  onChange={(event) => {
+                                    const nextValue = event.target.value;
+                                    setEditingShipmentValue(nextValue);
+                                    saveShipmentFieldValue(
+                                      shipment.id,
+                                      "pointOfContact",
+                                      nextValue
+                                    );
+                                    setEditingShipmentField(null);
+                                    setEditingShipmentValue("");
+                                  }}
+                                  onBlur={cancelEditingShipmentField}
                                   onKeyDown={(event) => {
-                                    if (event.key === "Enter") {
-                                      saveEditingShipmentField();
-                                    }
                                     if (event.key === "Escape") {
                                       cancelEditingShipmentField();
                                     }
                                   }}
                                   autoFocus
-                                />
+                                >
+                                  <option value="" disabled>Select roster member</option>
+                                  {blueprintsRosterNames.map((name) => (
+                                    <option key={name} value={name}>{name}</option>
+                                  ))}
+                                </select>
                               ) : (
                                 <span>{shipment.pointOfContact || "No point of contact"}</span>
                               )}
