@@ -2220,6 +2220,8 @@ button.shipment-notes-copy {
 }
 
 .shipment-inline-field {
+  display: flex;
+  width: 100%;
   gap: 10px;
   margin-top: 4px;
 }
@@ -2227,7 +2229,7 @@ button.shipment-notes-copy {
 .shipment-inline-label {
   color: #5c7ea3;
   font-weight: 700;
-  min-width: 40px;
+  min-width: max-content;
 }
 
 .shipment-inline-input,

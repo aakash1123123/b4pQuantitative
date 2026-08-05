@@ -1301,6 +1301,7 @@ export default function App() {
   const [newShipmentRecipientName, setNewShipmentRecipientName] = useState("");
   const [newShipmentType, setNewShipmentType] = useState("Local");
   const [newShipmentPointOfContact, setNewShipmentPointOfContact] = useState("");
+  const [newShipmentRecipientPointOfContact, setNewShipmentRecipientPointOfContact] = useState("");
   const [newShipmentSupplyIds, setNewShipmentSupplyIds] = useState("");
   const [selectedInventoryIds, setSelectedInventoryIds] = useState([]);
   const [valuationRange, setValuationRange] = useState({ min: 0, max: 0 });
@@ -1831,6 +1832,7 @@ export default function App() {
     setNewShipmentRecipientName("");
     setNewShipmentType("Local");
     setNewShipmentPointOfContact("");
+    setNewShipmentRecipientPointOfContact("");
     setNewShipmentSupplyIds("");
     setIsShipmentModalOpen(true);
   }
@@ -1841,6 +1843,7 @@ export default function App() {
     setNewShipmentRecipientName("");
     setNewShipmentType("Local");
     setNewShipmentPointOfContact("");
+    setNewShipmentRecipientPointOfContact("");
     setNewShipmentSupplyIds("");
   }
 
@@ -1848,6 +1851,7 @@ export default function App() {
     setNewShipmentRecipientName("");
     setNewShipmentType("Local");
     setNewShipmentPointOfContact("");
+    setNewShipmentRecipientPointOfContact("");
     setNewShipmentSupplyIds("");
     setIsCreateShipmentModalOpen(true);
   }
@@ -1857,6 +1861,7 @@ export default function App() {
     setNewShipmentRecipientName("");
     setNewShipmentType("Local");
     setNewShipmentPointOfContact("");
+    setNewShipmentRecipientPointOfContact("");
     setNewShipmentSupplyIds("");
   }
 
@@ -1917,12 +1922,19 @@ export default function App() {
     );
   }
 
-  function buildShipmentRecord(recipientName, shipmentType, pointOfContact, items = []) {
+  function buildShipmentRecord(
+    recipientName,
+    shipmentType,
+    pointOfContact,
+    recipientPointOfContact,
+    items = []
+  ) {
     return {
       id: `shipment-${Date.now()}`,
       recipientName,
       shipmentType: normalizeShipmentType(shipmentType),
       pointOfContact,
+      recipientPointOfContact: recipientPointOfContact || "TBD",
       filterMode: "original",
       createdAt: todayIsoDate(),
       consolidationStartedAt: "",
@@ -1954,12 +1966,18 @@ export default function App() {
         const recipientName = newShipmentRecipientName.trim();
         const shipmentType = newShipmentType;
         const pointOfContact = newShipmentPointOfContact.trim();
+        const recipientPointOfContact = newShipmentRecipientPointOfContact.trim() || "TBD";
 
         if (!recipientName || !shipmentType || !pointOfContact) {
           return currentShipments;
         }
 
-        const newShipment = buildShipmentRecord(recipientName, shipmentType, pointOfContact);
+        const newShipment = buildShipmentRecord(
+          recipientName,
+          shipmentType,
+          pointOfContact,
+          recipientPointOfContact
+        );
         targetShipmentId = newShipment.id;
         workingShipments = [
           ...currentShipments,
@@ -1994,6 +2012,7 @@ export default function App() {
     const recipientName = newShipmentRecipientName.trim();
     const shipmentType = newShipmentType;
     const pointOfContact = newShipmentPointOfContact.trim();
+    const recipientPointOfContact = newShipmentRecipientPointOfContact.trim() || "TBD";
     const shipmentItems = itemsFromSupplyIds(newShipmentSupplyIds);
 
     if (!recipientName || !shipmentType || !pointOfContact) {
@@ -2006,6 +2025,7 @@ export default function App() {
         recipientName,
         shipmentType,
         pointOfContact,
+        recipientPointOfContact,
         shipmentItems.map(normalizeShipmentItem)
       ),
     ]);
@@ -4151,7 +4171,7 @@ export default function App() {
                               </button>
                             </div>
                             <div className="shipment-inline-edit shipment-card-subline shipment-inline-field">
-                              <span className="shipment-inline-label">PoC:</span>
+                              <span className="shipment-inline-label">Blueprints PoC:</span>
                               {editingShipmentField?.shipmentId === shipment.id &&
                               editingShipmentField?.field === "pointOfContact" ? (
                                 <input
@@ -4186,6 +4206,40 @@ export default function App() {
                                 }
                               >
                                 ✎
+                              </button>
+                            </div>
+                            <div className="shipment-inline-edit shipment-card-subline shipment-inline-field">
+                              <span className="shipment-inline-label">Recipient PoC:</span>
+                              {editingShipmentField?.shipmentId === shipment.id &&
+                              editingShipmentField?.field === "recipientPointOfContact" ? (
+                                <input
+                                  className="shipment-inline-input"
+                                  type="text"
+                                  value={editingShipmentValue}
+                                  onChange={(event) => setEditingShipmentValue(event.target.value)}
+                                  onBlur={saveEditingShipmentField}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") saveEditingShipmentField();
+                                    if (event.key === "Escape") cancelEditingShipmentField();
+                                  }}
+                                  autoFocus
+                                />
+                              ) : (
+                                <span>{shipment.recipientPointOfContact || "TBD"}</span>
+                              )}
+                              <button
+                                type="button"
+                                className="edit-icon-button"
+                                aria-label={`Edit recipient point of contact for ${shipment.recipientName}`}
+                                onClick={() =>
+                                  startEditingShipmentField(
+                                    shipment.id,
+                                    "recipientPointOfContact",
+                                    shipment.recipientPointOfContact || "TBD"
+                                  )
+                                }
+                              >
+                                &#9998;
                               </button>
                             </div>
                           </div>
@@ -4615,7 +4669,8 @@ export default function App() {
                             <span className="shipment-status-label">Shipment Details</span>
                             <div className="shipment-history-list">
                               <span>{shipment.shipmentType || "Not set"}</span>
-                              <span>{shipment.pointOfContact || "No point of contact"}</span>
+                              <span>Blueprints PoC: {shipment.pointOfContact || "Not set"}</span>
+                              <span>Recipient PoC: {shipment.recipientPointOfContact || "TBD"}</span>
                               <span>{shipment.transportType || "Method not set"}</span>
                             </div>
                           </div>
@@ -5080,6 +5135,24 @@ export default function App() {
                       placeholder="Enter point of contact"
                     />
                   </label>
+                  <label className="modal-field">
+                    <span className="modal-field-header">
+                      <span>Recipient Point of Contact</span>
+                      <button
+                        type="button"
+                        className="modal-shortcut-button"
+                        onClick={() => setNewShipmentRecipientPointOfContact("TBD")}
+                      >
+                        TBD
+                      </button>
+                    </span>
+                    <input
+                      type="text"
+                      value={newShipmentRecipientPointOfContact}
+                      onChange={(event) => setNewShipmentRecipientPointOfContact(event.target.value)}
+                      placeholder="Enter recipient point of contact or select TBD"
+                    />
+                  </label>
                 </>
               ) : null}
             </div>
@@ -5275,6 +5348,24 @@ export default function App() {
                   value={newShipmentPointOfContact}
                   onChange={(event) => setNewShipmentPointOfContact(event.target.value)}
                   placeholder="Enter point of contact"
+                />
+              </label>
+              <label className="modal-field">
+                <span className="modal-field-header">
+                  <span>Recipient Point of Contact</span>
+                  <button
+                    type="button"
+                    className="modal-shortcut-button"
+                    onClick={() => setNewShipmentRecipientPointOfContact("TBD")}
+                  >
+                    TBD
+                  </button>
+                </span>
+                <input
+                  type="text"
+                  value={newShipmentRecipientPointOfContact}
+                  onChange={(event) => setNewShipmentRecipientPointOfContact(event.target.value)}
+                  placeholder="Enter recipient point of contact or select TBD"
                 />
               </label>
               <label className="modal-field">
