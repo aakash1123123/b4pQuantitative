@@ -4249,7 +4249,7 @@ export default function App() {
                               "Consolidation Complete"
                             }
                           >
-                            Shipped
+                            Deliver
                           </button>
                         </div>
                       </div>
