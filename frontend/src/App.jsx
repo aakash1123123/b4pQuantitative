@@ -41,14 +41,18 @@ function normalizeShipmentType(value) {
   return value === "National" ? "International" : value || "Local";
 }
 
-function normalizePastShipmentStatus(value, deliveryDate = "") {
-  if (value === "Delivered") {
+function normalizePastShipmentStatus(value, deliveryDate = "", manualOverride = "") {
+  if (manualOverride === "Shipped" || (value === "Shipped" && manualOverride === true)) {
+    return "Shipped";
+  }
+  if (manualOverride === "Delivered") {
     return "Delivered";
   }
-  if (deliveryDate && deliveryDate !== "TBD") {
-    return "Delivered";
-  }
-  return "Shipped";
+
+  const hasScheduledDeliveryDate = /^\d{4}-\d{2}-\d{2}$/.test(deliveryDate);
+  return hasScheduledDeliveryDate && deliveryDate <= todayIsoDate()
+    ? "Delivered"
+    : "Shipped";
 }
 
 function todayIsoDate() {
@@ -1330,6 +1334,7 @@ export default function App() {
   const [editingShipmentNotesValue, setEditingShipmentNotesValue] = useState("");
   const [shippingShipmentId, setShippingShipmentId] = useState(null);
   const [deliveringShipmentId, setDeliveringShipmentId] = useState(null);
+  const [revertingDeliveredShipmentId, setRevertingDeliveredShipmentId] = useState(null);
   const [shipmentDate, setShipmentDate] = useState("");
   const [transportType, setTransportType] = useState("Car");
   const [transportTypeOther, setTransportTypeOther] = useState("");
@@ -1437,7 +1442,12 @@ export default function App() {
               consolidationStartedAt: shipment.consolidationStartedAt || "",
               consolidationCompletedAt: shipment.consolidationCompletedAt || "",
               pastShipmentStatus: Boolean(shipment.isCompleted)
-                ? normalizePastShipmentStatus(shipment.pastShipmentStatus, shipment.deliveryDate)
+                ? normalizePastShipmentStatus(
+                    shipment.pastShipmentStatus,
+                    shipment.deliveryDate,
+                    shipment.pastShipmentStatusOverride ||
+                      (shipment.pastShipmentStatusManuallySet ? "Shipped" : "")
+                  )
                 : undefined,
               items: (shipment.items || []).map(normalizeShipmentItem),
             })
@@ -1495,6 +1505,10 @@ export default function App() {
 
   const currentShipments = shipments.filter((shipment) => !shipment.isCompleted);
   const pastShipments = shipments.filter((shipment) => shipment.isCompleted);
+  const deliveringShipment = shipments.find((shipment) => shipment.id === deliveringShipmentId);
+  const revertingDeliveredShipment = shipments.find(
+    (shipment) => shipment.id === revertingDeliveredShipmentId
+  );
   const currentShipmentRequestTotals = shipments
     .filter((shipment) => !shipment.isCompleted)
     .reduce((accumulator, shipment) => {
@@ -2388,6 +2402,7 @@ export default function App() {
               transportType: resolvedTransportType,
               deliveryDate: resolvedDeliveryDate,
               pastShipmentStatus: normalizePastShipmentStatus(undefined, resolvedDeliveryDate),
+              pastShipmentStatusManuallySet: false,
               shipmentNotes: shipmentNotes.trim(),
             }
           : shipment
@@ -2417,13 +2432,31 @@ export default function App() {
       return;
     }
 
+    setRevertingDeliveredShipmentId(shipmentId);
+  }
+
+  function closeRevertToShippedModal() {
+    setRevertingDeliveredShipmentId(null);
+  }
+
+  function confirmRevertToShipped() {
+    if (!revertingDeliveredShipmentId) {
+      return;
+    }
+
     setShipments((currentShipments) =>
       currentShipments.map((shipment) =>
-        shipment.id === shipmentId
-          ? { ...shipment, pastShipmentStatus: nextStatus }
+        shipment.id === revertingDeliveredShipmentId
+          ? {
+              ...shipment,
+              pastShipmentStatus: "Shipped",
+              pastShipmentStatusOverride: "Shipped",
+              pastShipmentStatusManuallySet: true,
+            }
           : shipment
       )
     );
+    closeRevertToShippedModal();
   }
 
   function closeDeliveredModal() {
@@ -2469,7 +2502,9 @@ export default function App() {
               ...shipment,
               deliveryDate: deliveryDate.trim(),
               shipmentNotes: shipmentNotes.trim(),
-              pastShipmentStatus: "Delivered",
+              pastShipmentStatus: normalizePastShipmentStatus(undefined, deliveryDate.trim()),
+              pastShipmentStatusOverride: "Delivered",
+              pastShipmentStatusManuallySet: false,
             }
           : shipment
       )
@@ -3085,7 +3120,12 @@ export default function App() {
       count: shipments.filter(
         (shipment) =>
           shipment.isCompleted &&
-          normalizePastShipmentStatus(shipment.pastShipmentStatus, shipment.deliveryDate) === "Shipped"
+          normalizePastShipmentStatus(
+            shipment.pastShipmentStatus,
+            shipment.deliveryDate,
+            shipment.pastShipmentStatusOverride ||
+              (shipment.pastShipmentStatusManuallySet ? "Shipped" : "")
+          ) === "Shipped"
       ).length,
     },
     {
@@ -3093,7 +3133,12 @@ export default function App() {
       count: shipments.filter(
         (shipment) =>
           shipment.isCompleted &&
-          normalizePastShipmentStatus(shipment.pastShipmentStatus, shipment.deliveryDate) === "Delivered"
+          normalizePastShipmentStatus(
+            shipment.pastShipmentStatus,
+            shipment.deliveryDate,
+            shipment.pastShipmentStatusOverride ||
+              (shipment.pastShipmentStatusManuallySet ? "Shipped" : "")
+          ) === "Delivered"
       ).length,
     },
   ];
@@ -4249,7 +4294,7 @@ export default function App() {
                               "Consolidation Complete"
                             }
                           >
-                            Deliver
+                            Mark as Shipped
                           </button>
                         </div>
                       </div>
@@ -4541,7 +4586,9 @@ export default function App() {
                     );
                     const pastShipmentStatus = normalizePastShipmentStatus(
                       shipment.pastShipmentStatus,
-                      shipment.deliveryDate
+                      shipment.deliveryDate,
+                      shipment.pastShipmentStatusOverride ||
+                        (shipment.pastShipmentStatusManuallySet ? "Shipped" : "")
                     );
 
                     return (
@@ -5993,6 +6040,16 @@ export default function App() {
             </div>
 
             <div className="shipment-modal-body">
+              <p className="modal-item-name">
+                {deliveryDate > todayIsoDate()
+                  ? `This shipment is scheduled for delivery on ${deliveryDate}. That date has not been reached yet.`
+                  : `Confirm that ${deliveringShipment?.recipientName || "this shipment"} has been delivered.`}
+              </p>
+              {deliveryDate > todayIsoDate() ? (
+                <p className="shipment-empty">
+                  Continuing will mark the shipment Delivered early and override the automatic delivery-date status.
+                </p>
+              ) : null}
               <label className="modal-field">
                 <span>Delivery Date</span>
                 <input
@@ -6025,7 +6082,48 @@ export default function App() {
                 onClick={saveDeliveredStatus}
                 disabled={!deliveryDate.trim()}
               >
-                Save Delivered Status
+                Confirm Delivered
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {revertingDeliveredShipmentId ? (
+        <div className="modal-backdrop" role="presentation" onClick={closeRevertToShippedModal}>
+          <div
+            className="shipment-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="revert-to-shipped-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">Shipment Status Check</p>
+                <h2 id="revert-to-shipped-modal-title">Move this delivery back to Shipped?</h2>
+              </div>
+              <button type="button" className="modal-close" onClick={closeRevertToShippedModal}>
+                x
+              </button>
+            </div>
+
+            <div className="shipment-modal-body">
+              <p className="modal-item-name">
+                Confirm that <strong>{revertingDeliveredShipment?.recipientName || "this shipment"}</strong>{" "}
+                was marked Delivered in error.
+              </p>
+              <p className="shipment-empty">
+                Its scheduled delivery date will be retained, but the status will remain Shipped until someone changes it again.
+              </p>
+            </div>
+
+            <div className="shipment-modal-actions">
+              <button type="button" className="secondary-button" onClick={closeRevertToShippedModal}>
+                Cancel
+              </button>
+              <button type="button" className="primary-button" onClick={confirmRevertToShipped}>
+                Confirm Shipped Status
               </button>
             </div>
           </div>

@@ -2449,15 +2449,20 @@ button.shipment-notes-copy {
   place-items: center;
   padding: 20px;
   background: rgba(10, 30, 56, 0.38);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .shipment-modal {
   width: min(520px, 100%);
+  max-height: calc(100dvh - 40px);
   padding: 22px;
   border-radius: 20px;
   background: #ffffff;
   border: 1px solid #d6e4f3;
   box-shadow: 0 24px 60px rgba(16, 58, 102, 0.18);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .shipment-modal.shipment-modal-large {
