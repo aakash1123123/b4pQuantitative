@@ -1511,7 +1511,8 @@ export default function App() {
   const [newShipmentSupplyIds, setNewShipmentSupplyIds] = useState("");
   const [selectedInventoryIds, setSelectedInventoryIds] = useState([]);
   const [valuationRange, setValuationRange] = useState({ min: 0, max: 0 });
-  const [shipmentSearchTerm, setShipmentSearchTerm] = useState("");
+  const [currentShipmentSearchTerm, setCurrentShipmentSearchTerm] = useState("");
+  const [pastShipmentSearchTerm, setPastShipmentSearchTerm] = useState("");
   const [currentShipmentTypeFilter, setCurrentShipmentTypeFilter] = useState("All");
   const [currentShipmentStatusFilter, setCurrentShipmentStatusFilter] = useState("All");
   const [pastShipmentTypeFilter, setPastShipmentTypeFilter] = useState("All");
@@ -1523,7 +1524,8 @@ export default function App() {
   const [isNonInventoryShipmentModalOpen, setIsNonInventoryShipmentModalOpen] = useState(false);
   const [isShipmentValueDataOpen, setIsShipmentValueDataOpen] = useState(false);
   const [isShipmentItemsDataOpen, setIsShipmentItemsDataOpen] = useState(false);
-  const [shipmentKpiYear, setShipmentKpiYear] = useState(() => new Date().getFullYear());
+  const [shipmentValueKpiYear, setShipmentValueKpiYear] = useState(() => new Date().getFullYear());
+  const [shipmentItemsKpiYear, setShipmentItemsKpiYear] = useState(() => new Date().getFullYear());
   const [nonInventoryClinicName, setNonInventoryClinicName] = useState("");
   const [nonInventoryPointOfContact, setNonInventoryPointOfContact] = useState("");
   const [nonInventoryShipmentType, setNonInventoryShipmentType] = useState("Local");
@@ -1988,7 +1990,7 @@ export default function App() {
       return;
     }
     setActiveShipmentSubtab("past");
-    setShipmentSearchTerm(shipmentName || "");
+    setPastShipmentSearchTerm(shipmentName || "");
     setFocusedPastShipmentId(shipmentId);
   }
 
@@ -2816,7 +2818,8 @@ export default function App() {
   const allFilteredSelected =
     selectableFilteredInventoryRows.length > 0 &&
     selectableFilteredInventoryRows.every((row) => selectedInventoryIds.includes(row.id));
-  const normalizedShipmentSearch = shipmentSearchTerm.trim().toLowerCase();
+  const normalizedCurrentShipmentSearch = currentShipmentSearchTerm.trim().toLowerCase();
+  const normalizedPastShipmentSearch = pastShipmentSearchTerm.trim().toLowerCase();
   const currentShipmentRequestMap = currentShipments.reduce((accumulator, shipment) => {
     shipment.items.forEach((item) => {
       const supplyId = String(item.supplyId || item.id || "");
@@ -2837,7 +2840,7 @@ export default function App() {
 
     return accumulator;
   }, {});
-  const rankedShipments = rankShipmentsBySearch(currentShipments, normalizedShipmentSearch);
+  const rankedShipments = rankShipmentsBySearch(currentShipments, normalizedCurrentShipmentSearch);
   const filteredCurrentShipments = rankedShipments.filter((shipment) => {
     const matchesType =
       currentShipmentTypeFilter === "All" ||
@@ -2865,7 +2868,7 @@ export default function App() {
         ? Number(left.valuation) - Number(right.valuation)
         : Number(right.valuation) - Number(left.valuation)
     );
-  const rankedPastShipments = rankShipmentsBySearch(pastShipments, normalizedShipmentSearch);
+  const rankedPastShipments = rankShipmentsBySearch(pastShipments, normalizedPastShipmentSearch);
   const filteredPastShipments = rankedPastShipments
     .filter((shipment) =>
       pastShipmentTypeFilter === "All"
@@ -3427,14 +3430,6 @@ export default function App() {
         ),
     0
   );
-  const shipmentValueWindowStart = new Date(shipmentKpiYear, 0, 1);
-  shipmentValueWindowStart.setHours(0, 0, 0, 0);
-  const shipmentValueWindowEnd = new Date(shipmentKpiYear, 11, 31);
-  shipmentValueWindowEnd.setHours(0, 0, 0, 0);
-  const shipmentValueWindowDays = Math.max(
-    1,
-    Math.round((shipmentValueWindowEnd - shipmentValueWindowStart) / 86400000)
-  );
   const shipmentValueEntries = [
     ...pastShipments.map((shipment) => ({
       shipment,
@@ -3457,44 +3452,42 @@ export default function App() {
       shipmentItems: 0,
     })),
   ];
-  const shipmentValueByYearPoints = shipmentValueEntries
-    .filter((entry) => entry.shipmentDate)
-    .map((entry) => {
-      const { shipment, shipmentKind, shipmentDate, shipmentValue, shipmentItems } = entry;
-      const shippedDate = new Date(shipmentDate);
-      shippedDate.setHours(0, 0, 0, 0);
-      return {
-        shipment,
-        shipmentKind,
-        shippedDate,
-        shipmentValue,
-        shipmentItems,
-      };
-    })
-    .filter(
-      ({ shippedDate }) =>
-        shippedDate >= shipmentValueWindowStart && shippedDate <= shipmentValueWindowEnd
-    )
-    .sort((left, right) => left.shippedDate - right.shippedDate)
-    .reduce((accumulator, entry) => {
-      const previousTotal = accumulator.length > 0 ? accumulator[accumulator.length - 1].cumulativeValue : 0;
-      accumulator.push({
-        shipmentId: entry.shipment.id,
-        shipmentKind: entry.shipmentKind,
-        label: entry.shipment.recipientName || entry.shipment.clinicName || "Shipment",
-        shipmentDateLabel: entry.shipment.shippedAt || entry.shipment.createdAt,
-        shipmentValue: entry.shipmentValue,
-        shipmentItems: entry.shipmentItems,
-        cumulativeValue: previousTotal + entry.shipmentValue,
-        dayOffset: Math.max(
-          0,
-          Math.round((entry.shippedDate - shipmentValueWindowStart) / 86400000)
-        ),
-        totalDays: shipmentValueWindowDays,
-      });
-      return accumulator;
-    }, []);
-  const shipmentItemsByYearPoints = shipmentValueByYearPoints
+  function buildShipmentYearPoints(year) {
+    const windowStart = new Date(year, 0, 1);
+    windowStart.setHours(0, 0, 0, 0);
+    const windowEnd = new Date(year, 11, 31);
+    windowEnd.setHours(0, 0, 0, 0);
+    const totalDays = Math.max(1, Math.round((windowEnd - windowStart) / 86400000));
+
+    return shipmentValueEntries
+      .filter((entry) => entry.shipmentDate)
+      .map((entry) => {
+        const shippedDate = new Date(entry.shipmentDate);
+        shippedDate.setHours(0, 0, 0, 0);
+        return { ...entry, shippedDate };
+      })
+      .filter(({ shippedDate }) => shippedDate >= windowStart && shippedDate <= windowEnd)
+      .sort((left, right) => left.shippedDate - right.shippedDate)
+      .reduce((accumulator, entry) => {
+        const previousTotal =
+          accumulator.length > 0 ? accumulator[accumulator.length - 1].cumulativeValue : 0;
+        accumulator.push({
+          shipmentId: entry.shipment.id,
+          shipmentKind: entry.shipmentKind,
+          label: entry.shipment.recipientName || entry.shipment.clinicName || "Shipment",
+          shipmentDateLabel: entry.shipment.shippedAt || entry.shipment.createdAt,
+          shipmentValue: entry.shipmentValue,
+          shipmentItems: entry.shipmentItems,
+          cumulativeValue: previousTotal + entry.shipmentValue,
+          dayOffset: Math.max(0, Math.round((entry.shippedDate - windowStart) / 86400000)),
+          totalDays,
+        });
+        return accumulator;
+      }, []);
+  }
+
+  const shipmentValueByYearPoints = buildShipmentYearPoints(shipmentValueKpiYear);
+  const shipmentItemsByYearPoints = buildShipmentYearPoints(shipmentItemsKpiYear)
     .filter((point) => point.shipmentKind === "inventory")
     .reduce((accumulator, point) => {
     const previousTotal = accumulator.length > 0 ? accumulator[accumulator.length - 1].cumulativeItems : 0;
@@ -4307,8 +4300,8 @@ export default function App() {
                 <input
                   className="search-input"
                   type="text"
-                  value={shipmentSearchTerm}
-                  onChange={(event) => setShipmentSearchTerm(event.target.value)}
+                  value={currentShipmentSearchTerm}
+                  onChange={(event) => setCurrentShipmentSearchTerm(event.target.value)}
                   placeholder="Search shipments, supply IDs, supplies, or manufacturers"
                 />
                 <select
@@ -4898,8 +4891,8 @@ export default function App() {
                 <input
                   className="search-input"
                   type="text"
-                  value={shipmentSearchTerm}
-                  onChange={(event) => setShipmentSearchTerm(event.target.value)}
+                  value={pastShipmentSearchTerm}
+                  onChange={(event) => setPastShipmentSearchTerm(event.target.value)}
                   placeholder="Search shipments, supply IDs, supplies, or manufacturers"
                 />
                 <select
@@ -5290,7 +5283,7 @@ export default function App() {
                 <div className="panel-header">
                   <div>
                     <p className="section-label">Shipment Value by Year</p>
-                    <h3>Shipment values and cumulative total in {shipmentKpiYear}</h3>
+                    <h3>Shipment values and cumulative total in {shipmentValueKpiYear}</h3>
                   </div>
                   <button
                     type="button"
@@ -5310,30 +5303,30 @@ export default function App() {
                       onSelectShipment={jumpToPastShipment}
                     />
                   ) : (
-                    <p>No shipped-value history is available for {shipmentKpiYear}.</p>
+                    <p>No shipped-value history is available for {shipmentValueKpiYear}.</p>
                   )}
                 </div>
                 <div className="shipment-year-navigation" aria-label="Shipment value graph year">
                   <button
                     type="button"
                     className="secondary-button"
-                    title={`View shipment values for ${shipmentKpiYear - 1}`}
-                    onClick={() => setShipmentKpiYear((year) => year - 1)}
+                    title={`View shipment values for ${shipmentValueKpiYear - 1}`}
+                    onClick={() => setShipmentValueKpiYear((year) => year - 1)}
                   >
                     &larr;
                   </button>
-                  <strong>{shipmentKpiYear}</strong>
+                  <strong>{shipmentValueKpiYear}</strong>
                   <button
                     type="button"
                     className="secondary-button"
-                    disabled={shipmentKpiYear >= currentCalendarYear}
+                    disabled={shipmentValueKpiYear >= currentCalendarYear}
                     title={
-                      shipmentKpiYear >= currentCalendarYear
+                      shipmentValueKpiYear >= currentCalendarYear
                         ? "Future years are not available"
-                        : `View shipment values for ${shipmentKpiYear + 1}`
+                        : `View shipment values for ${shipmentValueKpiYear + 1}`
                     }
                     onClick={() =>
-                      setShipmentKpiYear((year) => Math.min(currentCalendarYear, year + 1))
+                      setShipmentValueKpiYear((year) => Math.min(currentCalendarYear, year + 1))
                     }
                   >
                     &rarr;
@@ -5345,7 +5338,7 @@ export default function App() {
                 <div className="panel-header">
                   <div>
                     <p className="section-label">Shipment Items by Year</p>
-                    <h3>Cumulative total items shipped in {shipmentKpiYear}</h3>
+                    <h3>Cumulative total items shipped in {shipmentItemsKpiYear}</h3>
                   </div>
                   <button
                     type="button"
@@ -5365,30 +5358,30 @@ export default function App() {
                       onSelectShipment={jumpToPastShipment}
                     />
                   ) : (
-                    <p>No shipped-item history is available for {shipmentKpiYear}.</p>
+                    <p>No shipped-item history is available for {shipmentItemsKpiYear}.</p>
                   )}
                 </div>
                 <div className="shipment-year-navigation" aria-label="Shipment item graph year">
                   <button
                     type="button"
                     className="secondary-button"
-                    title={`View shipment items for ${shipmentKpiYear - 1}`}
-                    onClick={() => setShipmentKpiYear((year) => year - 1)}
+                    title={`View shipment items for ${shipmentItemsKpiYear - 1}`}
+                    onClick={() => setShipmentItemsKpiYear((year) => year - 1)}
                   >
                     &larr;
                   </button>
-                  <strong>{shipmentKpiYear}</strong>
+                  <strong>{shipmentItemsKpiYear}</strong>
                   <button
                     type="button"
                     className="secondary-button"
-                    disabled={shipmentKpiYear >= currentCalendarYear}
+                    disabled={shipmentItemsKpiYear >= currentCalendarYear}
                     title={
-                      shipmentKpiYear >= currentCalendarYear
+                      shipmentItemsKpiYear >= currentCalendarYear
                         ? "Future years are not available"
-                        : `View shipment items for ${shipmentKpiYear + 1}`
+                        : `View shipment items for ${shipmentItemsKpiYear + 1}`
                     }
                     onClick={() =>
-                      setShipmentKpiYear((year) => Math.min(currentCalendarYear, year + 1))
+                      setShipmentItemsKpiYear((year) => Math.min(currentCalendarYear, year + 1))
                     }
                   >
                     &rarr;
@@ -5902,7 +5895,7 @@ export default function App() {
               <div>
                 <p className="section-label">Shipment Value by Year</p>
                 <h2 id="shipment-value-data-modal-title">
-                  All shipment value data points for {shipmentKpiYear}
+                  All shipment value data points for {shipmentValueKpiYear}
                 </h2>
               </div>
               <button
@@ -5977,7 +5970,7 @@ export default function App() {
               <div>
                 <p className="section-label">Shipment Items by Year</p>
                 <h2 id="shipment-items-data-modal-title">
-                  All shipment item data points for {shipmentKpiYear}
+                  All shipment item data points for {shipmentItemsKpiYear}
                 </h2>
               </div>
               <button
