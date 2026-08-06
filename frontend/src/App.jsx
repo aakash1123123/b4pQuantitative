@@ -39,6 +39,8 @@ const BUTTON_TOOLTIPS = {
   "view shipments": "Open current shipments",
   "shipment activity": "View shipment activity KPIs",
   "shipment flow time": "View shipment flow-time KPIs",
+  "edit pallet conformation": "Edit the pallet layout configuration",
+  "save conformation": "Save the updated pallet layout configuration",
   "same day": "Use the shipment date as the delivery date",
   tbd: "Set this value to TBD",
   "save shipped status": "Mark this shipment as shipped",
@@ -137,6 +139,9 @@ function controlTooltip(element) {
     if (placeholder.includes("search shipments")) return "Search shipments";
     if (placeholder.includes("search shipment or clinic")) return "Search non-inventory shipments";
     if (placeholder.includes("recipient name")) return "Enter the receiving clinic or organization";
+    if (placeholder.includes("recipient point of contact")) {
+      return "Enter the recipient point of contact or select TBD";
+    }
     if (placeholder.includes("point of contact")) return "Select a Blueprints point of contact";
     if (placeholder.includes("supply ids")) return "Enter supply IDs to add";
     if (placeholder.includes("shipment notes")) return "Add or update shipment notes";
@@ -4995,12 +5000,23 @@ export default function App() {
                                     : "shipment-status-select"
                                 }
                                 value={pastShipmentStatus}
+                                title="Change shipment status between Shipped and Delivered"
                                 onChange={(event) =>
                                   updatePastShipmentStatus(shipment.id, event.target.value)
                                 }
                               >
-                                <option value="Shipped">Shipped</option>
-                                <option value="Delivered">Delivered</option>
+                                <option
+                                  value="Shipped"
+                                  title="Mark this shipment as shipped but not yet delivered"
+                                >
+                                  Shipped
+                                </option>
+                                <option
+                                  value="Delivered"
+                                  title="Mark this shipment as delivered to the recipient"
+                                >
+                                  Delivered
+                                </option>
                               </select>
                             </div>
                           </div>
