@@ -997,6 +997,28 @@ table {
   text-align: center;
 }
 
+.shipment-year-navigation {
+  display: grid;
+  grid-template-columns: 44px minmax(90px, auto) 44px;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.shipment-year-navigation strong {
+  color: var(--brand-ink);
+  text-align: center;
+  font-size: 1rem;
+}
+
+.shipment-year-navigation .secondary-button {
+  min-width: 44px;
+  padding: 8px 10px;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
 .expiry-bars {
   display: grid;
   gap: 14px;
@@ -2488,6 +2510,95 @@ button.shipment-notes-copy {
 
 .shipment-modal.shipment-modal-large {
   width: min(680px, 100%);
+}
+
+.shipment-modal.shipment-value-data-modal {
+  width: min(1120px, 100%);
+}
+
+.shipment-value-month-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.shipment-value-month-group {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+  padding: 14px;
+  border: 1px solid #d6e4f3;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.shipment-value-month-heading {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.shipment-value-month-heading h3 {
+  margin: 0;
+  color: var(--brand-ink);
+  font-size: 1.1rem;
+}
+
+.shipment-value-month-heading span,
+.shipment-value-month-empty {
+  color: #5c7ea3;
+  font-size: 0.82rem;
+}
+
+.shipment-value-month-empty {
+  align-self: center;
+  margin: 0;
+}
+
+.shipment-value-point-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.shipment-value-point-card {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--brand-ink);
+  border-radius: 12px;
+  background: var(--brand-ink);
+  color: #cbdbff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.shipment-value-point-card:hover,
+.shipment-value-point-card:focus-visible {
+  border-color: #0069f3;
+  background: #0035a2;
+  box-shadow: 0 8px 18px rgba(0, 53, 162, 0.28);
+  outline: none;
+}
+
+.shipment-value-point-card strong {
+  color: #ffffff;
+  font-size: 1rem;
+}
+
+@media (max-width: 700px) {
+  .shipment-value-month-group {
+    grid-template-columns: 1fr;
+  }
+
+  .shipment-value-month-heading {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+  }
 }
 
 .inventory-kpi-modal {
