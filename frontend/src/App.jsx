@@ -1252,8 +1252,17 @@ function ShipmentBarChart({ data, variant = "primary" }) {
 }
 
 function formatCompactCurrency(value) {
+  if (value >= 1000000000000) {
+    const scaled = value / 1000000000000;
+    return `$${scaled.toFixed(scaled >= 100 ? 0 : scaled >= 10 ? 1 : 2)}T`;
+  }
+  if (value >= 1000000000) {
+    const scaled = value / 1000000000;
+    return `$${scaled.toFixed(scaled >= 100 ? 0 : scaled >= 10 ? 1 : 2)}B`;
+  }
   if (value >= 1000000) {
-    return `$${(value / 1000000).toFixed(value >= 10000000 ? 0 : 1)}M`;
+    const scaled = value / 1000000;
+    return `$${scaled.toFixed(scaled >= 100 ? 0 : scaled >= 10 ? 1 : 2)}M`;
   }
   if (value >= 1000) {
     return `$${Math.round(value / 1000)}K`;
@@ -1263,7 +1272,7 @@ function formatCompactCurrency(value) {
 
 function shipmentValueAxisMax(values) {
   const highestValue = Math.max(...values, 0);
-  return Math.max(100000, Math.ceil(highestValue / 100000) * 100000);
+  return highestValue > 0 ? highestValue : 1;
 }
 
 const MONTH_AXIS_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -1366,7 +1375,7 @@ function ShipmentValueLineChart({ points, xAxisEndLabel, onSelectShipment }) {
 
 function shipmentItemsAxisMax(values) {
   const highestValue = Math.max(...values, 0);
-  return Math.max(100, Math.ceil(highestValue / 100) * 100);
+  return highestValue > 0 ? highestValue : 1;
 }
 
 function ShipmentItemsLineChart({ points, xAxisEndLabel, onSelectShipment }) {
@@ -1466,6 +1475,7 @@ function ShipmentItemsLineChart({ points, xAxisEndLabel, onSelectShipment }) {
 }
 
 export default function App() {
+  const currentCalendarYear = new Date().getFullYear();
   const [activeTab, setActiveTab] = useState("inventory");
   const [activeShipmentSubtab, setActiveShipmentSubtab] = useState("current");
   const [activeShipmentKpiSubtab, setActiveShipmentKpiSubtab] = useState("overview");
@@ -1506,6 +1516,9 @@ export default function App() {
   const [nonInventoryValuationSort, setNonInventoryValuationSort] = useState("high-low");
   const [isCreateShipmentModalOpen, setIsCreateShipmentModalOpen] = useState(false);
   const [isNonInventoryShipmentModalOpen, setIsNonInventoryShipmentModalOpen] = useState(false);
+  const [isShipmentValueDataOpen, setIsShipmentValueDataOpen] = useState(false);
+  const [isShipmentItemsDataOpen, setIsShipmentItemsDataOpen] = useState(false);
+  const [shipmentKpiYear, setShipmentKpiYear] = useState(() => new Date().getFullYear());
   const [nonInventoryClinicName, setNonInventoryClinicName] = useState("");
   const [nonInventoryPointOfContact, setNonInventoryPointOfContact] = useState("");
   const [nonInventoryShipmentType, setNonInventoryShipmentType] = useState("Local");
@@ -3409,9 +3422,9 @@ export default function App() {
         ),
     0
   );
-  const shipmentValueWindowStart = new Date(new Date().getFullYear(), 0, 1);
+  const shipmentValueWindowStart = new Date(shipmentKpiYear, 0, 1);
   shipmentValueWindowStart.setHours(0, 0, 0, 0);
-  const shipmentValueWindowEnd = new Date(new Date().getFullYear(), 11, 31);
+  const shipmentValueWindowEnd = new Date(shipmentKpiYear, 11, 31);
   shipmentValueWindowEnd.setHours(0, 0, 0, 0);
   const shipmentValueWindowDays = Math.max(
     1,
@@ -3486,6 +3499,20 @@ export default function App() {
     });
     return accumulator;
     }, []);
+  const shipmentValuePointsByMonth = MONTH_AXIS_LABELS.map((month, monthIndex) => ({
+    month,
+    points: shipmentValueByYearPoints.filter((point) => {
+      const shippedDate = new Date(`${point.shipmentDateLabel}T00:00:00`);
+      return !Number.isNaN(shippedDate.getTime()) && shippedDate.getMonth() === monthIndex;
+    }),
+  }));
+  const shipmentItemPointsByMonth = MONTH_AXIS_LABELS.map((month, monthIndex) => ({
+    month,
+    points: shipmentItemsByYearPoints.filter((point) => {
+      const shippedDate = new Date(`${point.shipmentDateLabel}T00:00:00`);
+      return !Number.isNaN(shippedDate.getTime()) && shippedDate.getMonth() === monthIndex;
+    }),
+  }));
 
   return (
     <main className="page-shell">
@@ -5247,8 +5274,16 @@ export default function App() {
                 <div className="panel-header">
                   <div>
                     <p className="section-label">Shipment Value by Year</p>
-                    <h3>Shipment values and cumulative total this year</h3>
+                    <h3>Shipment values and cumulative total in {shipmentKpiYear}</h3>
                   </div>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    title="View every shipment value data point"
+                    onClick={() => setIsShipmentValueDataOpen(true)}
+                  >
+                    View all data points
+                  </button>
                 </div>
 
                 <div className="expiry-chart-card">
@@ -5259,8 +5294,34 @@ export default function App() {
                       onSelectShipment={jumpToPastShipment}
                     />
                   ) : (
-                    <p>No shipped-value history is available yet for this calendar year.</p>
+                    <p>No shipped-value history is available for {shipmentKpiYear}.</p>
                   )}
+                </div>
+                <div className="shipment-year-navigation" aria-label="Shipment value graph year">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    title={`View shipment values for ${shipmentKpiYear - 1}`}
+                    onClick={() => setShipmentKpiYear((year) => year - 1)}
+                  >
+                    &larr;
+                  </button>
+                  <strong>{shipmentKpiYear}</strong>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={shipmentKpiYear >= currentCalendarYear}
+                    title={
+                      shipmentKpiYear >= currentCalendarYear
+                        ? "Future years are not available"
+                        : `View shipment values for ${shipmentKpiYear + 1}`
+                    }
+                    onClick={() =>
+                      setShipmentKpiYear((year) => Math.min(currentCalendarYear, year + 1))
+                    }
+                  >
+                    &rarr;
+                  </button>
                 </div>
               </div>
 
@@ -5268,8 +5329,16 @@ export default function App() {
                 <div className="panel-header">
                   <div>
                     <p className="section-label">Shipment Items by Year</p>
-                    <h3>Cumulative total items shipped this year</h3>
+                    <h3>Cumulative total items shipped in {shipmentKpiYear}</h3>
                   </div>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    title="View every shipment item data point"
+                    onClick={() => setIsShipmentItemsDataOpen(true)}
+                  >
+                    View all data points
+                  </button>
                 </div>
 
                 <div className="expiry-chart-card">
@@ -5280,8 +5349,34 @@ export default function App() {
                       onSelectShipment={jumpToPastShipment}
                     />
                   ) : (
-                    <p>No shipped-item history is available yet for this calendar year.</p>
+                    <p>No shipped-item history is available for {shipmentKpiYear}.</p>
                   )}
+                </div>
+                <div className="shipment-year-navigation" aria-label="Shipment item graph year">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    title={`View shipment items for ${shipmentKpiYear - 1}`}
+                    onClick={() => setShipmentKpiYear((year) => year - 1)}
+                  >
+                    &larr;
+                  </button>
+                  <strong>{shipmentKpiYear}</strong>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={shipmentKpiYear >= currentCalendarYear}
+                    title={
+                      shipmentKpiYear >= currentCalendarYear
+                        ? "Future years are not available"
+                        : `View shipment items for ${shipmentKpiYear + 1}`
+                    }
+                    onClick={() =>
+                      setShipmentKpiYear((year) => Math.min(currentCalendarYear, year + 1))
+                    }
+                  >
+                    &rarr;
+                  </button>
                 </div>
               </div>
             </div>
@@ -5769,6 +5864,148 @@ export default function App() {
               >
                 Document Shipment
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isShipmentValueDataOpen ? (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={() => setIsShipmentValueDataOpen(false)}
+        >
+          <div
+            className="shipment-modal shipment-modal-large shipment-value-data-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shipment-value-data-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">Shipment Value by Year</p>
+                <h2 id="shipment-value-data-modal-title">
+                  All shipment value data points for {shipmentKpiYear}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setIsShipmentValueDataOpen(false)}
+              >
+                x
+              </button>
+            </div>
+
+            <div className="shipment-value-month-list">
+              {shipmentValuePointsByMonth.map(({ month, points }) => (
+                <section className="shipment-value-month-group" key={month}>
+                  <div className="shipment-value-month-heading">
+                    <h3>{month}</h3>
+                    <span>{formatNumber(points.length)} data {points.length === 1 ? "point" : "points"}</span>
+                  </div>
+                  {points.length > 0 ? (
+                    <div className="shipment-value-point-grid">
+                      {points.map((point) => (
+                        <button
+                          type="button"
+                          className="shipment-value-point-card"
+                          key={`${point.shipmentKind}-${point.shipmentId}-${point.dayOffset}`}
+                          title={`Open ${point.label}`}
+                          onClick={() => {
+                            setIsShipmentValueDataOpen(false);
+                            jumpToPastShipment(
+                              point.shipmentId,
+                              point.label,
+                              point.shipmentKind
+                            );
+                          }}
+                        >
+                          <strong>{point.label}</strong>
+                          <span>{point.shipmentDateLabel}</span>
+                          <span>
+                            {point.shipmentKind === "non-inventory"
+                              ? "Non-inventory shipment"
+                              : "Inventory shipment"}
+                          </span>
+                          <span>{formatCurrency(point.shipmentValue)} shipment value</span>
+                          <span>{formatCurrency(point.cumulativeValue)} running total</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="shipment-value-month-empty">No shipment data for this month.</p>
+                  )}
+                </section>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isShipmentItemsDataOpen ? (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={() => setIsShipmentItemsDataOpen(false)}
+        >
+          <div
+            className="shipment-modal shipment-modal-large shipment-value-data-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shipment-items-data-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <p className="section-label">Shipment Items by Year</p>
+                <h2 id="shipment-items-data-modal-title">
+                  All shipment item data points for {shipmentKpiYear}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setIsShipmentItemsDataOpen(false)}
+              >
+                x
+              </button>
+            </div>
+
+            <div className="shipment-value-month-list">
+              {shipmentItemPointsByMonth.map(({ month, points }) => (
+                <section className="shipment-value-month-group" key={month}>
+                  <div className="shipment-value-month-heading">
+                    <h3>{month}</h3>
+                    <span>{formatNumber(points.length)} data {points.length === 1 ? "point" : "points"}</span>
+                  </div>
+                  {points.length > 0 ? (
+                    <div className="shipment-value-point-grid">
+                      {points.map((point) => (
+                        <button
+                          type="button"
+                          className="shipment-value-point-card"
+                          key={`${point.shipmentId}-${point.dayOffset}`}
+                          title={`Open ${point.label}`}
+                          onClick={() => {
+                            setIsShipmentItemsDataOpen(false);
+                            jumpToPastShipment(point.shipmentId, point.label, "inventory");
+                          }}
+                        >
+                          <strong>{point.label}</strong>
+                          <span>{point.shipmentDateLabel}</span>
+                          <span>Inventory shipment</span>
+                          <span>{formatNumber(point.shipmentItems)} items added</span>
+                          <span>{formatNumber(point.cumulativeItems)} items running total</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="shipment-value-month-empty">No shipment data for this month.</p>
+                  )}
+                </section>
+              ))}
             </div>
           </div>
         </div>
