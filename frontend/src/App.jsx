@@ -5248,7 +5248,7 @@ export default function App() {
                   <ShipmentBarChart data={shipmentsByType.map((entry) => ({
                     label: entry.type,
                     count: entry.count,
-                  }))} variant="secondary" />
+                  }))} />
                 </div>
               </div>
 
