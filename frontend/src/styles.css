@@ -986,11 +986,15 @@ table {
   right: 0;
   bottom: 0;
   height: 40px;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   align-items: flex-end;
-  justify-content: flex-end;
   color: #5c7ea3;
   font-size: 0.82rem;
+}
+
+.shipment-line-chart-x-axis span {
+  text-align: center;
 }
 
 .expiry-bars {
@@ -1819,7 +1823,7 @@ tbody tr.inventory-row-partial:hover {
 
 .non-inventory-shipment-details {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin: 16px 0 0;
 }

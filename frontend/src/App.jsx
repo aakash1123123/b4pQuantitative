@@ -1266,16 +1266,18 @@ function shipmentValueAxisMax(values) {
   return Math.max(100000, Math.ceil(highestValue / 100000) * 100000);
 }
 
+const MONTH_AXIS_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 function ShipmentValueLineChart({ points, xAxisEndLabel, onSelectShipment }) {
   const plotWidth = 560;
   const plotHeight = 240;
-  const axisMax = shipmentValueAxisMax(points.map((point) => point.cumulativeValue));
+  const axisMax = shipmentValueAxisMax(points.map((point) => point.shipmentValue));
   const yTicks = Array.from({ length: 5 }, (_, index) => ((4 - index) / 4) * axisMax);
   const [activePointKey, setActivePointKey] = useState(null);
   const coordinates = points.map((point) => ({
     ...point,
     x: (point.dayOffset / point.totalDays) * plotWidth,
-    y: plotHeight - (point.cumulativeValue / axisMax) * plotHeight,
+    y: plotHeight - (point.shipmentValue / axisMax) * plotHeight,
   }));
   const activePoint =
     coordinates.find((point) => `${point.shipmentId}-${point.dayOffset}` === activePointKey) || null;
@@ -1339,7 +1341,13 @@ function ShipmentValueLineChart({ points, xAxisEndLabel, onSelectShipment }) {
             <button
               type="button"
               className="shipment-line-chart-link"
-              onClick={() => onSelectShipment(activePoint.shipmentId, activePoint.label)}
+              onClick={() =>
+                onSelectShipment(
+                  activePoint.shipmentId,
+                  activePoint.label,
+                  activePoint.shipmentKind
+                )
+              }
             >
               {activePoint.label}
             </button>
@@ -1349,8 +1357,7 @@ function ShipmentValueLineChart({ points, xAxisEndLabel, onSelectShipment }) {
           </div>
         ) : null}
         <div className="shipment-line-chart-x-axis">
-          <span>Jan 1</span>
-          <span>{xAxisEndLabel}</span>
+          {MONTH_AXIS_LABELS.map((month) => <span key={month}>{month}</span>)}
         </div>
       </div>
     </div>
@@ -1435,7 +1442,13 @@ function ShipmentItemsLineChart({ points, xAxisEndLabel, onSelectShipment }) {
             <button
               type="button"
               className="shipment-line-chart-link"
-              onClick={() => onSelectShipment(activePoint.shipmentId, activePoint.label)}
+              onClick={() =>
+                onSelectShipment(
+                  activePoint.shipmentId,
+                  activePoint.label,
+                  activePoint.shipmentKind
+                )
+              }
             >
               {activePoint.label}
             </button>
@@ -1445,8 +1458,7 @@ function ShipmentItemsLineChart({ points, xAxisEndLabel, onSelectShipment }) {
           </div>
         ) : null}
         <div className="shipment-line-chart-x-axis">
-          <span>Jan 1</span>
-          <span>{xAxisEndLabel}</span>
+          {MONTH_AXIS_LABELS.map((month) => <span key={month}>{month}</span>)}
         </div>
       </div>
     </div>
@@ -1497,6 +1509,7 @@ export default function App() {
   const [nonInventoryClinicName, setNonInventoryClinicName] = useState("");
   const [nonInventoryPointOfContact, setNonInventoryPointOfContact] = useState("");
   const [nonInventoryShipmentType, setNonInventoryShipmentType] = useState("Local");
+  const [nonInventoryShipmentDate, setNonInventoryShipmentDate] = useState(todayIsoDate());
   const [nonInventoryValuation, setNonInventoryValuation] = useState("");
   const [detailsItem, setDetailsItem] = useState(null);
   const [returningShipmentItem, setReturningShipmentItem] = useState(null);
@@ -1660,7 +1673,12 @@ export default function App() {
       if (storedShipments) {
         const parsedShipments = JSON.parse(storedShipments);
         if (Array.isArray(parsedShipments)) {
-          setNonInventoryShipments(parsedShipments);
+          setNonInventoryShipments(
+            parsedShipments.map((shipment) => ({
+              ...shipment,
+              shippedAt: shipment.shippedAt || shipment.createdAt || "",
+            }))
+          );
         }
       }
     } catch (err) {
@@ -1944,8 +1962,13 @@ export default function App() {
     });
   }
 
-  function jumpToPastShipment(shipmentId, shipmentName) {
+  function jumpToPastShipment(shipmentId, shipmentName, shipmentKind = "inventory") {
     setActiveTab("shipments");
+    if (shipmentKind === "non-inventory") {
+      setActiveShipmentSubtab("non-inventory");
+      setNonInventoryShipmentSearch(shipmentName || "");
+      return;
+    }
     setActiveShipmentSubtab("past");
     setShipmentSearchTerm(shipmentName || "");
     setFocusedPastShipmentId(shipmentId);
@@ -2055,6 +2078,7 @@ export default function App() {
     setNonInventoryClinicName("");
     setNonInventoryPointOfContact("");
     setNonInventoryShipmentType("Local");
+    setNonInventoryShipmentDate(todayIsoDate());
     setNonInventoryValuation("");
     setIsNonInventoryShipmentModalOpen(true);
   }
@@ -2064,17 +2088,21 @@ export default function App() {
     setNonInventoryClinicName("");
     setNonInventoryPointOfContact("");
     setNonInventoryShipmentType("Local");
+    setNonInventoryShipmentDate(todayIsoDate());
     setNonInventoryValuation("");
   }
 
   function createNonInventoryShipment() {
     const clinicName = nonInventoryClinicName.trim();
     const pointOfContact = nonInventoryPointOfContact.trim();
+    const shippedAt = nonInventoryShipmentDate.trim();
     const valuation = Number(nonInventoryValuation);
 
     if (
       !clinicName ||
       !blueprintsRosterNames.includes(pointOfContact) ||
+      !shippedAt ||
+      shippedAt > todayIsoDate() ||
       nonInventoryValuation === "" ||
       valuation < 0
     ) {
@@ -2088,6 +2116,7 @@ export default function App() {
         clinicName,
         pointOfContact,
         shipmentType: normalizeShipmentType(nonInventoryShipmentType),
+        shippedAt,
         valuation,
         createdAt: todayIsoDate(),
       },
@@ -3388,22 +3417,40 @@ export default function App() {
     1,
     Math.round((shipmentValueWindowEnd - shipmentValueWindowStart) / 86400000)
   );
-  const shipmentValueByYearPoints = pastShipments
-    .filter((shipment) => shipment.shippedAt)
-    .map((shipment) => {
-      const shippedDate = new Date(shipment.shippedAt);
+  const shipmentValueEntries = [
+    ...pastShipments.map((shipment) => ({
+      shipment,
+      shipmentKind: "inventory",
+      shipmentDate: shipment.shippedAt,
+      shipmentValue: shipment.items.reduce(
+        (total, item) => total + requestedShipmentItemValue(item),
+        0
+      ),
+      shipmentItems: shipment.items.reduce(
+        (total, item) => total + normalizeRequestedQuantity(item),
+        0
+      ),
+    })),
+    ...nonInventoryShipments.map((shipment) => ({
+      shipment,
+      shipmentKind: "non-inventory",
+      shipmentDate: shipment.shippedAt || shipment.createdAt,
+      shipmentValue: Number(shipment.valuation) || 0,
+      shipmentItems: 0,
+    })),
+  ];
+  const shipmentValueByYearPoints = shipmentValueEntries
+    .filter((entry) => entry.shipmentDate)
+    .map((entry) => {
+      const { shipment, shipmentKind, shipmentDate, shipmentValue, shipmentItems } = entry;
+      const shippedDate = new Date(shipmentDate);
       shippedDate.setHours(0, 0, 0, 0);
       return {
         shipment,
+        shipmentKind,
         shippedDate,
-        shipmentValue: shipment.items.reduce(
-          (total, item) => total + requestedShipmentItemValue(item),
-          0
-        ),
-        shipmentItems: shipment.items.reduce(
-          (total, item) => total + normalizeRequestedQuantity(item),
-          0
-        ),
+        shipmentValue,
+        shipmentItems,
       };
     })
     .filter(
@@ -3415,8 +3462,9 @@ export default function App() {
       const previousTotal = accumulator.length > 0 ? accumulator[accumulator.length - 1].cumulativeValue : 0;
       accumulator.push({
         shipmentId: entry.shipment.id,
-        label: entry.shipment.recipientName || "Shipment",
-        shipmentDateLabel: entry.shipment.shippedAt,
+        shipmentKind: entry.shipmentKind,
+        label: entry.shipment.recipientName || entry.shipment.clinicName || "Shipment",
+        shipmentDateLabel: entry.shipment.shippedAt || entry.shipment.createdAt,
         shipmentValue: entry.shipmentValue,
         shipmentItems: entry.shipmentItems,
         cumulativeValue: previousTotal + entry.shipmentValue,
@@ -3428,14 +3476,16 @@ export default function App() {
       });
       return accumulator;
     }, []);
-  const shipmentItemsByYearPoints = shipmentValueByYearPoints.reduce((accumulator, point) => {
+  const shipmentItemsByYearPoints = shipmentValueByYearPoints
+    .filter((point) => point.shipmentKind === "inventory")
+    .reduce((accumulator, point) => {
     const previousTotal = accumulator.length > 0 ? accumulator[accumulator.length - 1].cumulativeItems : 0;
     accumulator.push({
       ...point,
       cumulativeItems: previousTotal + point.shipmentItems,
     });
     return accumulator;
-  }, []);
+    }, []);
 
   return (
     <main className="page-shell">
@@ -4793,6 +4843,10 @@ export default function App() {
                             <dd>{shipment.shipmentType}</dd>
                           </div>
                           <div>
+                            <dt>Date Shipped</dt>
+                            <dd>{shipment.shippedAt || "Not recorded"}</dd>
+                          </div>
+                          <div>
                             <dt>Valuation</dt>
                             <dd>{formatCurrency(shipment.valuation)}</dd>
                           </div>
@@ -5193,7 +5247,7 @@ export default function App() {
                 <div className="panel-header">
                   <div>
                     <p className="section-label">Shipment Value by Year</p>
-                    <h3>Cumulative value shipped this year</h3>
+                    <h3>Shipment values and cumulative total this year</h3>
                   </div>
                 </div>
 
@@ -5643,12 +5697,12 @@ export default function App() {
 
             <div className="shipment-modal-body">
               <label className="modal-field">
-                <span>Clinic Name</span>
+                <span>Recipient / Clinic Name</span>
                 <input
                   type="text"
                   value={nonInventoryClinicName}
                   onChange={(event) => setNonInventoryClinicName(event.target.value)}
-                  placeholder="Enter clinic name"
+                  placeholder="Enter recipient or clinic name"
                 />
               </label>
               <label className="modal-field">
@@ -5675,6 +5729,15 @@ export default function App() {
                 </select>
               </label>
               <label className="modal-field">
+                <span>Date Shipped</span>
+                <input
+                  type="date"
+                  max={todayIsoDate()}
+                  value={nonInventoryShipmentDate}
+                  onChange={(event) => setNonInventoryShipmentDate(event.target.value)}
+                />
+              </label>
+              <label className="modal-field">
                 <span>Valuation of Items</span>
                 <input
                   type="number"
@@ -5698,6 +5761,8 @@ export default function App() {
                 disabled={
                   !nonInventoryClinicName.trim() ||
                   !blueprintsRosterNames.includes(nonInventoryPointOfContact) ||
+                  !nonInventoryShipmentDate.trim() ||
+                  nonInventoryShipmentDate > todayIsoDate() ||
                   nonInventoryValuation === "" ||
                   Number(nonInventoryValuation) < 0
                 }
