@@ -390,32 +390,45 @@ function formatExpiration(value) {
   return value || "No expiration date";
 }
 
-function daysUntil(dateValue) {
+// A bare "YYYY-MM-DD" is parsed by Date as UTC midnight, which lands on the
+// previous calendar day for anyone west of UTC. Every date the dashboard shows
+// is a calendar date, so build it in local time instead.
+function parseLocalDate(dateValue) {
   if (!dateValue) {
+    return null;
+  }
+
+  const isoDateParts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateValue).trim());
+  const parsed = isoDateParts
+    ? new Date(Number(isoDateParts[1]), Number(isoDateParts[2]) - 1, Number(isoDateParts[3]))
+    : new Date(dateValue);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
+}
+
+function daysUntil(dateValue) {
+  const target = parseLocalDate(dateValue);
+  if (!target) {
     return null;
   }
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const target = new Date(dateValue);
-  target.setHours(0, 0, 0, 0);
   return Math.round((target - today) / 86400000);
 }
 
 function daysBetweenDates(targetDateValue, referenceDateValue) {
-  if (!targetDateValue || !referenceDateValue) {
+  const referenceDate = parseLocalDate(referenceDateValue);
+  const targetDate = parseLocalDate(targetDateValue);
+
+  if (!referenceDate || !targetDate) {
     return null;
   }
-
-  const referenceDate = new Date(referenceDateValue);
-  const targetDate = new Date(targetDateValue);
-
-  if (Number.isNaN(referenceDate.getTime()) || Number.isNaN(targetDate.getTime())) {
-    return null;
-  }
-
-  referenceDate.setHours(0, 0, 0, 0);
-  targetDate.setHours(0, 0, 0, 0);
 
   return Math.round((targetDate - referenceDate) / 86400000);
 }
@@ -642,24 +655,31 @@ function average(values) {
   return values.reduce((total, value) => total + value, 0) / values.length;
 }
 
+// Expiry urgency is a single-hue ramp stepped by lightness, not a
+// red-amber-yellow rainbow: two adjacent warm hues collapse into each other
+// under red-green colour blindness, whereas a lightness order survives it.
+// Validated as an ordinal ramp (monotone L, gaps >= 0.06, light end >= 2:1).
+// "365+ days" and "No expiration" sit outside the ramp as reserved states.
 const expirationBucketColors = {
-  "Already expired": "#111111",
-  "Already Expired": "#111111",
-  "0-90 days": "#d93025",
-  "90-180 days": "#f57c00",
-  "180-365 days": "#f4c542",
-  "365+ days": "#1e8e3e",
-  "No expiration": "#b7c9dc",
-  "No expiration date": "#b7c9dc",
+  "Already expired": "#5E140C",
+  "Already Expired": "#5E140C",
+  "0-90 days": "#A32B10",
+  "90-180 days": "#D35F2A",
+  "180-365 days": "#D98038",
+  "365+ days": "#1E7A43",
+  "No expiration": "#6B7A90",
+  "No expiration date": "#6B7A90",
 };
 
+// Warehouse duration is a magnitude, so it gets one hue light-to-dark --
+// the brand azure running down into the logo's navy. Validated ordinal.
 const durationBucketColors = {
-  "0-30 days": "#f8f8f8",
-  "31-90 days": "#d7d7d7",
-  "91-180 days": "#9a9a9a",
-  "181-365 days": "#4e4e4e",
-  "365+ days": "#111111",
-  "Unknown duration": "#d8dde6",
+  "0-30 days": "#8FB4F3",
+  "31-90 days": "#5A8FE8",
+  "91-180 days": "#2467CE",
+  "181-365 days": "#0A3F97",
+  "365+ days": "#001A4A",
+  "Unknown duration": "#C6D8F2",
 };
 
 const durationBucketOrder = [
@@ -670,43 +690,84 @@ const durationBucketOrder = [
   "365+ days",
 ];
 
+// Supply category is identity, not magnitude, so it needs distinct hues rather
+// than the twelve shades of blue this used to be (four of which were
+// indistinguishable even with full colour vision). Fixed order, led by the
+// brand azure, never cycled. Every slice also carries its name in the legend,
+// which is what keeps identity off colour alone.
 const categoryPiePalette = [
-  "#000e3f",
-  "#0035a2",
-  "#0069f3",
-  "#373c82",
-  "#7699e7",
-  "#cbdbff",
-  "#001b68",
-  "#3159b8",
-  "#6688d6",
-  "#9bb5ed",
-  "#b7caff",
-  "#e4ebff",
+  "#0069F2",
+  "#B87F00",
+  "#1E4FC4",
+  "#4E9A00",
+  "#5B57D8",
+  "#6F8A00",
+  "#8E4EC6",
+  "#E4670A",
+  "#A03C9E",
+  "#9A7A00",
+  "#2E6FB8",
+  "#2F8F2F",
+];
+// Anything past the fixed order is not given a new hue -- it goes neutral.
+const categoryOverflowColor = "#6B7A90";
+
+// The fixed order mirrors the backend's approved category list, so a category
+// keeps the same hue no matter what is filtered out, shipped, or missing from
+// the sheet. Colour follows the category, never its rank in the current chart.
+const categoryColorOrder = [
+  "Airway & Oxygen",
+  "Apparel (Gowns, Shoe Covers, etc.)",
+  "Catheters & Briefs",
+  "Gloves",
+  "IV Supplies",
+  "Masks & Face Shields",
+  "Misc Non-Medical",
+  "Misc Surgical",
+  "Needles & Syringes",
+  "Sutures",
+  "Vitals & Home Health",
+  "Wound Care & Bandages",
 ];
 
+function colorForCategory(categoryName) {
+  const index = categoryColorOrder.indexOf(categoryName);
+  return index >= 0 ? categoryPiePalette[index] : categoryOverflowColor;
+}
+
+function colorForBoxType(index) {
+  return index < boxCategoryPalette.length
+    ? boxCategoryPalette[index]
+    : categoryOverflowColor;
+}
+
 const valueBucketOrder = ["$0-$50", "$50-$100", "$100-$200", "$200+"];
+// Price bands are a magnitude: one hue, light to dark. Validated ordinal.
 const valueBucketColors = {
-  "$0-$50": "#dff5df",
-  "$50-$100": "#a8dda8",
-  "$100-$200": "#5baa5b",
-  "$200+": "#1f6f3c",
+  "$0-$50": "#7EBD90",
+  "$50-$100": "#4FA268",
+  "$100-$200": "#2A8048",
+  "$200+": "#0F5C30",
 };
 
 const supplyStatusOrder = ["Inventory", "Pulled", "Consolidated"];
+// The workflow is a progression, so it reads as one hue darkening as a supply
+// moves from shelf to shipment. Validated ordinal.
 const supplyStatusColors = {
-  Inventory: "#cbdbff",
-  Pulled: "#0035a2",
-  Consolidated: "#1f6f3c",
+  Inventory: "#8FB4F3",
+  Pulled: "#0069F2",
+  Consolidated: "#001A4A",
 };
 
+// Box categories are identity too; take the first six of the fixed order so a
+// box type keeps the same hue it has in the category chart.
 const boxCategoryPalette = [
-  "#000e3f",
-  "#0035a2",
-  "#0069f3",
-  "#373c82",
-  "#7699e7",
-  "#cbdbff",
+  "#0069F2",
+  "#B87F00",
+  "#1E4FC4",
+  "#4E9A00",
+  "#5B57D8",
+  "#6F8A00",
 ];
 
 function valueBucketForUnitPrice(unitPrice) {
@@ -988,7 +1049,7 @@ function ShipmentDistributionChart({ shipmentItems }) {
         label: bucket.value,
         value: rawItems,
         valuation,
-        color: categoryPiePalette[index % categoryPiePalette.length],
+        color: colorForCategory(bucket.value),
       };
     })
     .filter((segment) => segment.value > 0)
@@ -1486,6 +1547,7 @@ export default function App() {
   const [activeShipmentKpiSubtab, setActiveShipmentKpiSubtab] = useState("overview");
   const [items, setItems] = useState([]);
   const [kpis, setKpis] = useState(null);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -1595,6 +1657,7 @@ export default function App() {
 
       setItems(itemsData);
       setKpis(kpisData);
+      setLastRefreshedAt(new Date());
     } catch (err) {
       setError(err.message || "Something went wrong while loading the dashboard.");
       throw err;
@@ -1610,7 +1673,7 @@ export default function App() {
     const observer = new MutationObserver(() => applyDashboardTooltips());
     observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
-  });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -2955,7 +3018,7 @@ export default function App() {
         label: bucket.value,
         value: rawItems,
         entries: bucket.count,
-        color: categoryPiePalette[index % categoryPiePalette.length],
+        color: colorForCategory(bucket.value),
       };
     })
     .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label));
@@ -3013,7 +3076,7 @@ export default function App() {
         label: bucket.value,
         value: rawItems,
         boxCount: uniqueBoxes.size,
-        color: boxCategoryPalette[index % boxCategoryPalette.length],
+        color: colorForBoxType(index),
       };
     });
   const totalBoxCategoryItems = boxCategoryChartData.reduce(
@@ -3124,7 +3187,7 @@ export default function App() {
         value: rawItems,
         total: activePalletTotalSupplies,
         percentage: percentOfTotal(rawItems, activePalletTotalSupplies),
-        color: categoryPiePalette[index % categoryPiePalette.length],
+        color: colorForCategory(bucket.value),
       };
     })
     .filter((segment) => segment.value > 0);
@@ -3158,7 +3221,7 @@ export default function App() {
         total: activePalletTotalSupplies,
         percentage: percentOfTotal(rawItems, activePalletTotalSupplies),
         boxCount: uniqueBoxes.size,
-        color: boxCategoryPalette[index % boxCategoryPalette.length],
+        color: colorForBoxType(index),
       };
     })
     .filter((segment) => segment.value > 0);
@@ -3460,13 +3523,8 @@ export default function App() {
     const totalDays = Math.max(1, Math.round((windowEnd - windowStart) / 86400000));
 
     return shipmentValueEntries
-      .filter((entry) => entry.shipmentDate)
-      .map((entry) => {
-        const shippedDate = new Date(entry.shipmentDate);
-        shippedDate.setHours(0, 0, 0, 0);
-        return { ...entry, shippedDate };
-      })
-      .filter(({ shippedDate }) => shippedDate >= windowStart && shippedDate <= windowEnd)
+      .map((entry) => ({ ...entry, shippedDate: parseLocalDate(entry.shipmentDate) }))
+      .filter(({ shippedDate }) => shippedDate && shippedDate >= windowStart && shippedDate <= windowEnd)
       .sort((left, right) => left.shippedDate - right.shippedDate)
       .reduce((accumulator, entry) => {
         const previousTotal =
@@ -3500,27 +3558,77 @@ export default function App() {
   const shipmentValuePointsByMonth = MONTH_AXIS_LABELS.map((month, monthIndex) => ({
     month,
     points: shipmentValueByYearPoints.filter((point) => {
-      const shippedDate = new Date(`${point.shipmentDateLabel}T00:00:00`);
-      return !Number.isNaN(shippedDate.getTime()) && shippedDate.getMonth() === monthIndex;
+      const shippedDate = parseLocalDate(point.shipmentDateLabel);
+      return Boolean(shippedDate) && shippedDate.getMonth() === monthIndex;
     }),
   }));
   const shipmentItemPointsByMonth = MONTH_AXIS_LABELS.map((month, monthIndex) => ({
     month,
     points: shipmentItemsByYearPoints.filter((point) => {
-      const shippedDate = new Date(`${point.shipmentDateLabel}T00:00:00`);
-      return !Number.isNaN(shippedDate.getTime()) && shippedDate.getMonth() === monthIndex;
+      const shippedDate = parseLocalDate(point.shipmentDateLabel);
+      return Boolean(shippedDate) && shippedDate.getMonth() === monthIndex;
     }),
   }));
 
+  // Each tab is a sheet in the set; the title block names the one you're on.
+  const sheetCodes = {
+    inventory: "INV-01",
+    kpis: "INV-02",
+    shipments: "SHP-03",
+    "shipment-kpis": "SHP-04",
+  };
+  const activeSheetCode = sheetCodes[activeTab] || "INV-01";
+  const lastRefreshedLabel = lastRefreshedAt
+    ? lastRefreshedAt.toLocaleTimeString(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "—";
+  const totalUnitsOnHand = inventoryRowsWithStatus.reduce(
+    (total, row) => total + (row.quantity || 0),
+    0
+  );
+
   return (
     <main className="page-shell">
+      {/* A drawing sheet names itself in a ruled title block. This one carries
+          the live counts, so the header does a job instead of just branding. */}
       <header className="top-bar">
-        <h1>Blueprints Operations Dashboard</h1>
-        <img
-          className="dashboard-logo"
-          src="/blueprints-logo.png"
-          alt="Blueprints for Pangaea"
-        />
+        <div className="title-block">
+          <div className="title-block-cell">
+            <h1>
+              <em>Blueprints for Pangaea</em>
+              Operations Dashboard
+            </h1>
+          </div>
+          <div className="title-block-cell">
+            <p className="title-block-label">Sheet</p>
+            <p className="title-block-value">{activeSheetCode}</p>
+          </div>
+          <div className="title-block-cell">
+            <p className="title-block-label">Entries</p>
+            <p className="title-block-value">
+              {loading || error ? "—" : formatNumber(inventoryRowsWithStatus.length)}
+            </p>
+          </div>
+          <div className="title-block-cell">
+            <p className="title-block-label">Units on hand</p>
+            <p className="title-block-value">
+              {loading || error ? "—" : formatNumber(totalUnitsOnHand)}
+            </p>
+          </div>
+          <div className="title-block-cell">
+            <p className="title-block-label">Sheet pulled</p>
+            <p className="title-block-value">{lastRefreshedLabel}</p>
+          </div>
+        </div>
+        <div className="title-block-logo">
+          <img
+            className="dashboard-logo"
+            src="/blueprints-logo.png"
+            alt="Blueprints for Pangaea"
+          />
+        </div>
       </header>
 
       <section className="tabs-section">
@@ -4357,9 +4465,11 @@ export default function App() {
                             <div className="shipment-inline-edit">
                               {editingShipmentField?.shipmentId === shipment.id &&
                               editingShipmentField?.field === "recipientName" ? (
-                                <select
-                                  className="shipment-inline-select"
+                                <input
+                                  className="shipment-inline-input"
+                                  type="text"
                                   value={editingShipmentValue}
+                                  placeholder="Enter recipient name"
                                   onChange={(event) => setEditingShipmentValue(event.target.value)}
                                   onBlur={saveEditingShipmentField}
                                   onKeyDown={(event) => {
@@ -4371,12 +4481,7 @@ export default function App() {
                                     }
                                   }}
                                   autoFocus
-                                >
-                                  <option value="" disabled>Select roster member</option>
-                                  {blueprintsRosterNames.map((name) => (
-                                    <option key={name} value={name}>{name}</option>
-                                  ))}
-                                </select>
+                                />
                               ) : (
                                 <h3>{shipment.recipientName}</h3>
                               )}
@@ -4917,7 +5022,7 @@ export default function App() {
               </div>
               {filteredPastShipments.length === 0 ? (
                 <p>
-                  {normalizedShipmentSearch || pastShipmentTypeFilter !== "All"
+                  {normalizedPastShipmentSearch || pastShipmentTypeFilter !== "All"
                     ? "No past shipments matched those filters."
                     : "No past shipments yet."}
                 </p>
