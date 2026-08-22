@@ -1,62 +1,57 @@
 /* ============================================================
    Blueprints for Pangaea — operations dashboard
-   Palette taken from the organisation logo: the navy landmass
-   (#001A4A), the azure landmass (#0069F2) and the mid blue
-   between them (#0039A4). Everything else is derived from those
-   three. Chart ramps are validated for colour-vision deficiency.
+   Palette and type follow blueprintsforpangaea.org: a white ground,
+   true-neutral greys, near-black text, and blue used only for
+   actions and active state. Chart ramps are validated for
+   colour-vision deficiency.
    ============================================================ */
 :root {
-  /* --- logo primaries --- */
-  --bp-navy: #001A4A;
-  --bp-azure: #0069F2;
-  --bp-mid: #0039A4;
+  /* --- brand blue, used as an accent --- */
+  --bp-blue: #0337a3;
+  --bp-blue-bright: #116dff;
+  --bp-blue-deep: #02275c;
+  --bp-blue-tint: #eaf1ff;
 
-  /* --- ink scale (navy tinted toward white) --- */
-  --bp-ink: #001A4A;
-  --bp-ink-strong: #0F3470;
-  --bp-ink-muted: #1E4A8F;
-  --bp-ink-soft: #39649E;
-  --bp-ink-faint: #5B7FA8;
+  /* --- neutral greys: the site's greys are neutral, not blue-tinted --- */
+  --bp-ink: #212121;
+  --bp-ink-strong: #2b2b2b;
+  --bp-ink-muted: #646464;
+  --bp-ink-faint: #8f8f8f;
 
-  /* --- rules and borders --- */
-  --bp-line-strong: #A9C2E8;
-  --bp-line: #C6D8F2;
-  --bp-line-soft: #DCE7F8;
+  --bp-line: #e2e2e2;
+  --bp-line-strong: #d5d5d5;
 
-  /* --- surfaces: the drawing sheet and the paper on it --- */
-  --bp-sheet: #E8F0FE;
   --bp-surface: #ffffff;
-  --bp-surface-raised: #F6F9FF;
-  --bp-surface-sunken: #EDF3FF;
+  --bp-surface-raised: #fafafa;
+  --bp-surface-sunken: #f4f4f4;
+  --bp-sheet: #f7f7f7;
 
-  /* --- the blueprint grid ruled onto the sheet --- */
-  --bp-grid-minor: rgba(0, 105, 242, 0.07);
-  --bp-grid-major: rgba(0, 26, 74, 0.09);
-  --bp-grid-minor-step: 26px;
-  --bp-grid-major-step: 130px;
+  --bp-red: #df3131;
 
-  /* --- legacy aliases, kept so existing rules keep resolving --- */
-  --brand-medium: var(--bp-azure);
-  --brand-dark: var(--bp-mid);
-  --brand-light: #CBDBFF;
-  --brand-ink: var(--bp-navy);
-  --brand-secondary: var(--bp-mid);
+  /* --- type: Jost stands in for the site's Futura, Inter for body --- */
+  --bp-display: "Jost", "Futura", "Century Gothic", sans-serif;
+  --bp-body: "Inter", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  --bp-mono: var(--bp-body);
+
+  /* --- legacy aliases so existing rules keep resolving --- */
+  --bp-navy: var(--bp-ink);
+  --bp-azure: var(--bp-blue-bright);
+  --bp-mid: var(--bp-blue);
+  --brand-medium: var(--bp-blue-bright);
+  --brand-dark: var(--bp-blue);
+  --brand-light: var(--bp-line);
+  --brand-ink: var(--bp-ink);
+  --brand-secondary: var(--bp-ink-muted);
   --brand-white: var(--bp-surface);
   --page-background: var(--bp-sheet);
-
-  /* --- type: Archivo for the drafting voice, Plex for reading,
-         Plex Mono for every measured value --- */
-  --bp-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
-  --bp-body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
-  --bp-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
   font-family: var(--bp-body);
   color: var(--bp-ink);
   background: var(--bp-sheet);
 }
 
-/* Numbers in a warehouse are measurements: set every figure in the
-   mono face with tabular figures so columns align down 341 rows. */
+/* Figures line up in columns without switching to a monospace face --
+   Inter's tabular figures are enough and keep the page looking clean. */
 .metric-value,
 .pill,
 .filter-count,
@@ -69,8 +64,10 @@
 .shipment-line-chart-y-axis span,
 .expiration-pie-center strong,
 .shipment-distribution-center strong,
-.details-item strong {
-  font-family: var(--bp-mono);
+.details-item strong,
+.inventory-results tbody td:nth-child(n + 7),
+.shipment-kpi-table td:nth-child(n + 3),
+.title-block-value {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
@@ -83,21 +80,8 @@ body {
   margin: 0;
   min-width: 320px;
   color: var(--bp-ink);
-  /* The sheet is ruled like drafting paper: a fine grid with a
-     heavier one every fifth line, the way the logo's globe carries
-     fine meridians over heavier ones. */
-  background-color: var(--bp-sheet);
-  background-image:
-    linear-gradient(var(--bp-grid-major) 1px, transparent 1px),
-    linear-gradient(90deg, var(--bp-grid-major) 1px, transparent 1px),
-    linear-gradient(var(--bp-grid-minor) 1px, transparent 1px),
-    linear-gradient(90deg, var(--bp-grid-minor) 1px, transparent 1px);
-  background-size:
-    var(--bp-grid-major-step) var(--bp-grid-major-step),
-    var(--bp-grid-major-step) var(--bp-grid-major-step),
-    var(--bp-grid-minor-step) var(--bp-grid-minor-step),
-    var(--bp-grid-minor-step) var(--bp-grid-minor-step);
-  background-attachment: fixed;
+  background: var(--bp-sheet);
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -123,20 +107,19 @@ table {
   align-items: stretch;
   gap: 0;
   margin-bottom: 18px;
-  border: 1px solid var(--bp-navy);
-  border-radius: 4px;
+  border: 1px solid var(--bp-line);
+  border-radius: 6px;
   background: var(--bp-surface);
-  box-shadow: 0 1px 0 var(--bp-line-strong), 0 18px 34px rgba(0, 26, 74, 0.1);
   overflow: hidden;
 }
 
-/* A hairline azure rule under the block, like the trim line on a drawing. */
+/* One blue hairline along the top edge -- the only accent the header needs. */
 .top-bar::after {
   content: "";
   position: absolute;
-  inset: auto 0 0 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--bp-navy), var(--bp-azure) 55%, var(--bp-mid));
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--bp-blue);
 }
 
 .title-block {
@@ -161,22 +144,22 @@ table {
 
 .title-block-label {
   margin: 0;
-  font-family: var(--bp-mono);
-  font-size: 0.62rem;
-  font-weight: 500;
-  letter-spacing: 0.16em;
+  font-family: var(--bp-body);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--bp-ink-faint);
 }
 
 .title-block-value {
   margin: 0;
-  font-family: var(--bp-mono);
-  font-size: 1rem;
-  font-weight: 600;
+  font-family: var(--bp-display);
+  font-size: 1.24rem;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-  color: var(--bp-ink-strong);
+  line-height: 1.05;
+  color: var(--bp-ink);
 }
 
 .title-block-logo {
@@ -191,23 +174,23 @@ table {
 .top-bar h1 {
   margin: 0;
   font-family: var(--bp-display);
-  font-size: clamp(1.25rem, 2.1vw, 1.72rem);
-  font-weight: 700;
-  letter-spacing: -0.014em;
-  line-height: 1.05;
-  color: var(--bp-navy);
+  font-size: clamp(1.3rem, 2.1vw, 1.8rem);
+  font-weight: 500;
+  letter-spacing: 0.002em;
+  line-height: 1.08;
+  color: var(--bp-ink);
 }
 
 .top-bar h1 em {
   display: block;
-  font-family: var(--bp-mono);
+  font-family: var(--bp-body);
   font-size: 0.66rem;
   font-style: normal;
-  font-weight: 500;
-  letter-spacing: 0.17em;
+  font-weight: 600;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
-  color: var(--bp-azure);
-  margin-bottom: 6px;
+  color: var(--bp-blue);
+  margin-bottom: 7px;
 }
 
 .dashboard-logo {
@@ -238,15 +221,14 @@ table {
   color: var(--bp-ink-muted);
   cursor: pointer;
   transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
-  font-family: var(--bp-mono);
-  font-size: 0.74rem;
+  font-family: var(--bp-body);
+  font-size: 0.78rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .tab-button:hover {
-  background: #DCE7F8;
+  background: #ececec;
   color: var(--bp-navy);
 }
 
@@ -268,14 +250,12 @@ table {
   z-index: 1;
 }
 
-/* The azure index tab down the top edge marks the live sheet. */
 .tab-button.active::before {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
-  height: 3px;
-  border-radius: 3px 3px 0 0;
-  background: var(--bp-azure);
+  height: 2px;
+  background: var(--bp-blue);
 }
 
 .panel,
@@ -284,8 +264,8 @@ table {
   padding: 24px;
   border-radius: 0 6px 6px 6px;
   background: var(--bp-surface);
-  border: 1px solid var(--bp-line-strong);
-  box-shadow: 0 14px 30px rgba(0, 26, 74, 0.09);
+  border: 1px solid var(--bp-line);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .summary-card {
@@ -305,21 +285,12 @@ table {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-family: var(--bp-mono);
+  font-family: var(--bp-body);
   text-transform: uppercase;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.1em;
   font-size: 0.68rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--bp-ink-faint);
-}
-
-/* A short azure tick before each label, like a dimension mark. */
-.section-label::before {
-  content: "";
-  width: 14px;
-  height: 2px;
-  flex: none;
-  background: var(--bp-azure);
 }
 
 .panel-header h2,
@@ -374,13 +345,13 @@ table {
   padding: 22px;
   border: 1px solid var(--brand-light);
   border-radius: 18px;
-  background: #F6F9FF;
+  background: #fafafa;
 }
 
 .metric-card {
   padding: 18px;
   border-radius: 20px;
-  background: linear-gradient(180deg, var(--brand-white) 0%, #EDF3FF 100%);
+  background: linear-gradient(180deg, var(--brand-white) 0%, #f4f4f4 100%);
   border: 1px solid var(--brand-light);
 }
 
@@ -411,8 +382,8 @@ table {
   margin-bottom: 20px;
   padding: 18px;
   border-radius: 18px;
-  background: #F6F9FF;
-  border: 1px solid #DCE7F8;
+  background: #fafafa;
+  border: 1px solid #ececec;
 }
 
 .kpi-analytics-grid {
@@ -444,7 +415,7 @@ table {
 .expiry-chart-card h4 {
   margin: 0 0 16px;
   font-family: var(--bp-display);
-  color: #0F3470;
+  color: #212121;
 }
 
 .expiration-pie-layout {
@@ -464,7 +435,7 @@ table {
   width: 200px;
   aspect-ratio: 1;
   border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgba(0, 26, 74, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 
@@ -474,7 +445,7 @@ table {
   inset: 28px;
   border-radius: 50%;
   background: #ffffff;
-  box-shadow: inset 0 0 0 1px rgba(220, 231, 248, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(236, 236, 236, 0.9);
 }
 
 .expiration-pie-center {
@@ -491,13 +462,13 @@ table {
   font-family: var(--bp-display);
   font-size: 1.55rem;
   line-height: 1;
-  color: #0F3470;
+  color: #212121;
 }
 
 .expiration-pie-center span {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #5B7FA8;
+  color: #8f8f8f;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -525,9 +496,9 @@ table {
 }
 
 .expiration-pie-legend-row.active {
-  border-color: #8AA3C2;
-  background: #EDF3FF;
-  box-shadow: 0 8px 18px rgba(0, 26, 74, 0.08);
+  border-color: #a8a8a8;
+  background: #f4f4f4;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
 }
 
 .expiration-pie-swatch {
@@ -543,17 +514,17 @@ table {
 }
 
 .expiration-pie-copy strong {
-  color: #0F3470;
+  color: #212121;
 }
 
 .expiration-pie-copy span {
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.92rem;
 }
 
 .expiration-pie-copy .expiration-pie-click-hint {
   margin-top: 4px;
-  color: #0039A4;
+  color: #0337a3;
   font-size: 0.82rem;
   font-weight: 700;
 }
@@ -574,7 +545,7 @@ table {
   fill: rgba(255, 255, 255, 0.24);
   stroke: #ffffff;
   stroke-width: 3px;
-  filter: drop-shadow(0 0 8px rgba(0, 26, 74, 0.18));
+  filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.12));
 }
 
 .category-pie-card .expiration-pie-layout {
@@ -645,9 +616,9 @@ table {
   overflow: hidden;
   border-radius: 20px;
   background:
-    linear-gradient(180deg, rgba(246, 249, 255, 0.98) 0%, rgba(237, 243, 255, 0.94) 100%),
+    linear-gradient(180deg, rgba(250, 250, 250, 0.98) 0%, rgba(244, 244, 244, 0.94) 100%),
     radial-gradient(circle at top left, rgba(143, 180, 222, 0.2), transparent 38%);
-  border: 1px solid #DCE7F8;
+  border: 1px solid #ececec;
 }
 
 .pallet-map-canvas.is-editing {
@@ -661,8 +632,8 @@ table {
   padding: 14px;
   border-radius: 18px;
   background: #ffffff;
-  border: 1px solid #A9C2E8;
-  box-shadow: 0 14px 26px rgba(0, 26, 74, 0.12);
+  border: 1px solid #d5d5d5;
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.08);
   display: grid;
   align-content: start;
   gap: 10px;
@@ -679,13 +650,13 @@ table {
   align-items: start;
   justify-content: space-between;
   gap: 10px;
-  color: #0F3470;
+  color: #212121;
 }
 
 .pallet-card-copy {
   display: grid;
   gap: 4px;
-  color: #39649E;
+  color: #646464;
   font-size: 0.88rem;
 }
 
@@ -698,8 +669,8 @@ table {
 .pallet-box-pill {
   border-radius: 12px;
   padding: 5px 7px;
-  background: #EDF3FF;
-  color: #1E4A8F;
+  background: #f4f4f4;
+  color: #2b2b2b;
   font-size: 0.72rem;
   font-weight: 700;
   line-height: 1.25;
@@ -719,14 +690,14 @@ table {
 .pallet-modal-metric-card {
   padding: 10px 12px;
   border-radius: 14px;
-  background: #F6F9FF;
-  border: 1px solid #DCE7F8;
+  background: #fafafa;
+  border: 1px solid #ececec;
   display: grid;
   gap: 4px;
 }
 
 .pallet-modal-metric-card span {
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.74rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -734,7 +705,7 @@ table {
 }
 
 .pallet-modal-metric-card strong {
-  color: #0F3470;
+  color: #212121;
   font-size: 1rem;
   line-height: 1.2;
 }
@@ -755,15 +726,15 @@ table {
 .pallet-mini-chart-card {
   padding: 16px;
   border-radius: 18px;
-  background: #F6F9FF;
-  border: 1px solid #DCE7F8;
+  background: #fafafa;
+  border: 1px solid #ececec;
   display: grid;
   gap: 12px;
 }
 
 .pallet-mini-chart-title {
   font-family: var(--bp-display);
-  color: #0F3470;
+  color: #212121;
   font-size: 1rem;
 }
 
@@ -779,7 +750,7 @@ table {
   width: 140px;
   aspect-ratio: 1;
   border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgba(0, 26, 74, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 
@@ -789,7 +760,7 @@ table {
   inset: 24px;
   border-radius: 50%;
   background: #ffffff;
-  box-shadow: inset 0 0 0 1px rgba(220, 231, 248, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(236, 236, 236, 0.9);
 }
 
 .pallet-mini-tooltip {
@@ -800,11 +771,11 @@ table {
   min-width: 170px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: #0F3470;
+  background: #212121;
   color: #ffffff;
   display: grid;
   gap: 4px;
-  box-shadow: 0 12px 26px rgba(0, 26, 74, 0.24);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.16);
   z-index: 4;
   pointer-events: none;
   font-size: 0.84rem;
@@ -817,20 +788,20 @@ table {
   bottom: -8px;
   width: 14px;
   height: 14px;
-  background: #0F3470;
+  background: #212121;
   transform: translateX(-50%) rotate(45deg);
 }
 
 .analytics-placeholder-card {
   padding: 18px;
   border-radius: 18px;
-  background: #F6F9FF;
-  border: 1px dashed #A9C2E8;
+  background: #fafafa;
+  border: 1px dashed #d5d5d5;
 }
 
 .analytics-placeholder-card h4 {
   margin: 0;
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-family: var(--bp-display);
 }
 
@@ -838,9 +809,9 @@ table {
   margin-top: 18px;
   padding: 16px 18px;
   border-radius: 16px;
-  background: #F6F9FF;
-  border: 1px solid #DCE7F8;
-  color: #39649E;
+  background: #fafafa;
+  border: 1px solid #ececec;
+  color: #646464;
 }
 
 .kpi-note-card p:last-child {
@@ -878,9 +849,9 @@ table {
 .shipment-kpi-summary-pane,
 .shipment-kpi-current-table-panel {
   padding: 18px;
-  border: 1px solid #DCE7F8;
+  border: 1px solid #ececec;
   border-radius: 18px;
-  background: #F6F9FF;
+  background: #fafafa;
   align-self: start;
 }
 
@@ -894,7 +865,7 @@ table {
 
 .shipment-kpi-pane-header h3 {
   margin: 0;
-  color: #0F3470;
+  color: #212121;
   font-family: var(--bp-display);
 }
 
@@ -911,19 +882,19 @@ table {
 .shipment-kpi-table {
   width: 100%;
   border-collapse: collapse;
-  color: #0F3470;
+  color: #212121;
 }
 
 .shipment-kpi-table th,
 .shipment-kpi-table td {
   padding: 12px;
-  border-bottom: 1px solid #DCE7F8;
+  border-bottom: 1px solid #ececec;
   text-align: left;
   white-space: nowrap;
 }
 
 .shipment-kpi-table th {
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.76rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -941,15 +912,15 @@ table {
   display: inline-flex;
   padding: 6px 9px;
   border-radius: 999px;
-  background: #EDF3FF;
-  color: #0039A4;
+  background: #f4f4f4;
+  color: #0337a3;
   font-size: 0.82rem;
   font-weight: 700;
 }
 
 .shipment-kpi-status-planning {
-  background: #EDF3FF;
-  color: #0039A4;
+  background: #f4f4f4;
+  color: #0337a3;
 }
 
 .shipment-kpi-status-consolidating {
@@ -975,7 +946,7 @@ table {
   flex-direction: column;
   justify-content: space-between;
   margin-bottom: 60px;
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.82rem;
 }
 
@@ -1000,11 +971,11 @@ table {
 }
 
 .shipment-bar-chart-grid span {
-  border-top: 1px solid #DCE7F8;
+  border-top: 1px solid #ececec;
 }
 
 .shipment-bar-chart-grid span:last-child {
-  border-bottom: 2px solid #A9C2E8;
+  border-bottom: 2px solid #d5d5d5;
 }
 
 .shipment-bar-chart-bars {
@@ -1030,7 +1001,7 @@ table {
   left: 50%;
   transform: translateX(-50%);
   font-weight: 700;
-  color: #39649E;
+  color: #646464;
   font-size: 0.92rem;
   white-space: nowrap;
 }
@@ -1076,7 +1047,7 @@ table {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.82rem;
 }
 
@@ -1100,11 +1071,11 @@ table {
 }
 
 .shipment-line-chart-grid span {
-  border-top: 1px solid #DCE7F8;
+  border-top: 1px solid #ececec;
 }
 
 .shipment-line-chart-grid span:last-child {
-  border-bottom: 2px solid #A9C2E8;
+  border-bottom: 2px solid #d5d5d5;
 }
 
 .shipment-line-chart-svg {
@@ -1152,7 +1123,7 @@ table {
   color: #ffffff;
   display: grid;
   gap: 4px;
-  box-shadow: 0 12px 26px rgba(0, 26, 74, 0.24);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.16);
   z-index: 4;
 }
 
@@ -1163,7 +1134,7 @@ table {
   bottom: -8px;
   width: 14px;
   height: 14px;
-  background: #0F3470;
+  background: #212121;
   transform: translateX(-50%) rotate(45deg);
 }
 
@@ -1187,7 +1158,7 @@ table {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   align-items: flex-end;
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.82rem;
 }
 
@@ -1235,7 +1206,7 @@ table {
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.92rem;
 }
 
@@ -1248,29 +1219,29 @@ table {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  color: #39649E;
+  color: #646464;
 }
 
 .expiry-bar-labels strong {
-  color: #0F3470;
+  color: #212121;
 }
 
 .expiry-bar-track {
   width: 100%;
   height: 12px;
   border-radius: 999px;
-  background: #DCE7F8;
+  background: #ececec;
   overflow: hidden;
 }
 
 .expiry-bar-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #0069F2 0%, #0F3470 100%);
+  background: linear-gradient(90deg, #116dff 0%, #212121 100%);
 }
 
 .expiry-bar-fill-secondary {
-  background: linear-gradient(90deg, #5A8FE8 0%, #0039A4 100%);
+  background: linear-gradient(90deg, #7fa9f5 0%, #0337a3 100%);
 }
 
 @media (max-width: 900px) {
@@ -1353,8 +1324,8 @@ table {
   overflow-y: auto;
   padding: 20px 18px;
   border-radius: 16px;
-  background: #F6F9FF;
-  border: 1px solid #DCE7F8;
+  background: #fafafa;
+  border: 1px solid #ececec;
 }
 
 .filter-drawer {
@@ -1387,7 +1358,7 @@ table {
   margin: 0;
   font-family: var(--bp-display);
   font-size: 1rem;
-  color: #0F3470;
+  color: #212121;
 }
 
 .filters-header-actions {
@@ -1402,23 +1373,23 @@ table {
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 1px solid #C6D8F2;
+  border: 1px solid #e2e2e2;
   border-radius: 10px;
   background: #ffffff;
-  color: #1E4A8F;
+  color: #2b2b2b;
   cursor: pointer;
   font-size: 1.35rem;
   line-height: 1;
 }
 
 .filter-drawer-close:hover {
-  background: #EDF3FF;
+  background: #f4f4f4;
 }
 
 .clear-filters {
   border: 0;
   background: transparent;
-  color: #0039A4;
+  color: #0337a3;
   font-weight: 700;
   cursor: pointer;
 }
@@ -1434,7 +1405,7 @@ table {
 .filter-group h4 {
   margin: 0 0 12px;
   font-size: 0.95rem;
-  color: #1E4A8F;
+  color: #2b2b2b;
 }
 
 .valuation-summary {
@@ -1442,7 +1413,7 @@ table {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
-  color: #39649E;
+  color: #646464;
   font-weight: 700;
 }
 
@@ -1463,7 +1434,7 @@ table {
 .valuation-range-track {
   left: 0;
   right: 0;
-  background: #DCE7F8;
+  background: #ececec;
 }
 
 .valuation-range-active {
@@ -1524,7 +1495,7 @@ table {
   align-items: center;
   gap: 10px;
   padding: 8px 0;
-  color: #1E4A8F;
+  color: #2b2b2b;
 }
 
 .filter-option input {
@@ -1532,7 +1503,7 @@ table {
 }
 
 .filter-count {
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.92rem;
 }
 
@@ -1558,7 +1529,7 @@ table {
   border: 1px solid transparent;
   border-radius: 50%;
   background: transparent;
-  color: #0069F2;
+  color: #116dff;
   cursor: pointer;
   font-size: 1.2rem;
   font-weight: 700;
@@ -1567,13 +1538,13 @@ table {
 }
 
 .info-icon-button:hover {
-  border-color: #8AA3C2;
-  background: #EDF3FF;
-  color: #0039A4;
+  border-color: #a8a8a8;
+  background: #f4f4f4;
+  color: #0337a3;
 }
 
 .info-icon-button:focus-visible {
-  outline: 3px solid rgba(0, 105, 242, 0.28);
+  outline: 3px solid rgba(17, 109, 255, 0.28);
   outline-offset: 2px;
 }
 
@@ -1590,8 +1561,8 @@ table {
 }
 
 .status-pill.inventory {
-  background: #EDF3FF;
-  color: #5B7FA8;
+  background: #f4f4f4;
+  color: #8f8f8f;
 }
 
 .status-pill.pulled {
@@ -1605,12 +1576,12 @@ table {
 }
 
 .status-pill.shipped {
-  background: #0F3470;
+  background: #212121;
   color: #ffffff;
 }
 
 .status-pill.delivered {
-  background: #0F3470;
+  background: #212121;
   color: #ffffff;
 }
 
@@ -1656,23 +1627,27 @@ table {
 }
 
 .expiration-pill.warning {
-  background: #D35F2A;
-  color: #ffffff;
+  background: #FCEDE2;
+  color: #8A3D14;
+  border: 1px solid #F3D3C0;
 }
 
 .expiration-pill.caution {
-  background: #D98038;
+  background: #FDF3E3;
   color: #6B4E00;
+  border: 1px solid #F0DFB8;
 }
 
 .expiration-pill.healthy {
-  background: #1E7A43;
-  color: #ffffff;
+  background: #E7F3EB;
+  color: #14612F;
+  border: 1px solid #C3E0CE;
 }
 
 .expiration-pill.none {
-  background: #DCE7F8;
-  color: #39649E;
+  background: #F0F0F0;
+  color: #5E5E5E;
+  border: 1px solid #E2E2E2;
 }
 
 .inventory-actions {
@@ -1686,10 +1661,10 @@ table {
   width: 20px;
   height: 20px;
   place-items: center;
-  border: 1px solid #8AA3C2;
+  border: 1px solid #a8a8a8;
   border-radius: 4px;
-  background: #EDF3FF;
-  color: #5B7FA8;
+  background: #f4f4f4;
+  color: #8f8f8f;
   font-size: 15px;
   font-weight: 700;
   line-height: 1;
@@ -1705,7 +1680,7 @@ table {
   align-items: center;
   gap: 10px;
   padding: 10px;
-  border: 1px solid #C6D8F2;
+  border: 1px solid #e2e2e2;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 14px 32px rgba(13, 59, 111, 0.24);
@@ -1743,7 +1718,7 @@ table {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  color: #39649E;
+  color: #646464;
   font-weight: 700;
 }
 
@@ -1768,13 +1743,13 @@ table {
   height: 30px;
   border: 0;
   border-radius: 999px;
-  background: #DCE7F8;
+  background: #ececec;
   cursor: pointer;
   transition: background 120ms ease;
 }
 
 .toggle-switch.on {
-  background: #0F3470;
+  background: #212121;
 }
 
 .toggle-knob {
@@ -1794,23 +1769,23 @@ table {
 
 .search-label {
   font-weight: 700;
-  color: #39649E;
+  color: #646464;
 }
 
 .search-input {
   width: min(100%, 520px);
   padding: 13px 16px;
-  border: 1px solid #C6D8F2;
+  border: 1px solid #e2e2e2;
   border-radius: 16px;
-  background: #F6F9FF;
-  color: #0F3470;
+  background: #fafafa;
+  color: #212121;
   outline: none;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .search-input:focus {
-  border-color: #0069F2;
-  box-shadow: 0 0 0 4px rgba(0, 105, 242, 0.12);
+  border-color: #116dff;
+  box-shadow: 0 0 0 4px rgba(17, 109, 255, 0.10);
 }
 
 table {
@@ -1823,7 +1798,7 @@ th,
 td {
   padding: 14px 16px;
   text-align: left;
-  border-bottom: 1px solid rgba(0, 26, 74, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 th:nth-child(1),
@@ -1882,7 +1857,7 @@ td:nth-child(9) {
 }
 
 th {
-  color: #39649E;
+  color: #646464;
   font-size: 0.88rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1890,7 +1865,7 @@ th {
 }
 
 tbody tr:hover {
-  background: rgba(232, 240, 254, 0.78);
+  background: rgba(244, 244, 244, 0.82);
 }
 
 tbody tr.inventory-row-review {
@@ -1911,7 +1886,7 @@ tbody tr.inventory-row-partial:hover {
 
 .empty-state-cell {
   text-align: center;
-  color: #5B7FA8;
+  color: #8f8f8f;
   padding: 24px 16px;
 }
 
@@ -1928,10 +1903,10 @@ tbody tr.inventory-row-partial:hover {
 
 .shipment-subtab {
   flex: 1 1 0;
-  border: 1px solid #C6D8F2;
+  border: 1px solid #e2e2e2;
   border-radius: 10px;
-  background: #EDF3FF;
-  color: #1E4A8F;
+  background: #f4f4f4;
+  color: #2b2b2b;
   padding: 14px 22px;
   font-weight: 700;
   font-size: 1rem;
@@ -1940,16 +1915,16 @@ tbody tr.inventory-row-partial:hover {
 }
 
 .shipment-subtab.active {
-  background: #0F3470;
-  border-color: #0F3470;
+  background: #212121;
+  border-color: #212121;
   color: #ffffff;
 }
 
 .shipment-subpanel {
   padding: 18px;
   border-radius: 16px;
-  background: #F6F9FF;
-  border: 1px solid #DCE7F8;
+  background: #fafafa;
+  border: 1px solid #ececec;
 }
 
 .create-shipment-bar {
@@ -2011,7 +1986,7 @@ tbody tr.inventory-row-partial:hover {
 
 .non-inventory-empty {
   margin: 0;
-  color: #5B7FA8;
+  color: #8f8f8f;
 }
 
 .non-inventory-filter-bar {
@@ -2036,9 +2011,9 @@ tbody tr.inventory-row-partial:hover {
 
 .non-inventory-shipment-card {
   padding: 16px;
-  border: 1px solid #C6D8F2;
+  border: 1px solid #e2e2e2;
   border-radius: 14px;
-  background: #F6F9FF;
+  background: #fafafa;
 }
 
 .non-inventory-shipment-details {
@@ -2055,7 +2030,7 @@ tbody tr.inventory-row-partial:hover {
 }
 
 .non-inventory-shipment-details dt {
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.82rem;
   font-weight: 700;
 }
@@ -2086,10 +2061,10 @@ tbody tr.inventory-row-partial:hover {
 .create-shipment-bar input {
   flex: 1 1 auto;
   padding: 12px 14px;
-  border: 1px solid #C6D8F2;
+  border: 1px solid #e2e2e2;
   border-radius: 14px;
   background: #ffffff;
-  color: #0F3470;
+  color: #212121;
 }
 
 .create-shipment-bar-past .search-input {
@@ -2106,16 +2081,16 @@ tbody tr.inventory-row-partial:hover {
   flex: 0 0 220px;
   min-width: 200px;
   padding: 12px 14px;
-  border: 1px solid #C6D8F2;
+  border: 1px solid #e2e2e2;
   border-radius: 14px;
   background: #ffffff;
-  color: #0F3470;
+  color: #212121;
 }
 
 .shipment-filter-select:focus {
   outline: none;
-  border-color: #0069F2;
-  box-shadow: 0 0 0 3px rgba(0, 105, 242, 0.12);
+  border-color: #116dff;
+  box-shadow: 0 0 0 3px rgba(17, 109, 255, 0.10);
 }
 
 .shipment-list {
@@ -2127,12 +2102,12 @@ tbody tr.inventory-row-partial:hover {
   padding: 18px;
   border-radius: 16px;
   background: #ffffff;
-  border: 1px solid #DCE7F8;
+  border: 1px solid #ececec;
 }
 
 .shipment-card-planning {
-  background: #F6F9FF;
-  border-color: #DCE7F8;
+  background: #fafafa;
+  border-color: #ececec;
 }
 
 .shipment-card-consolidating {
@@ -2148,7 +2123,7 @@ tbody tr.inventory-row-partial:hover {
 
 .shipment-card-past {
   background: #ffffff;
-  border-color: #DCE7F8;
+  border-color: #ececec;
 }
 
 .shipment-card-delivered {
@@ -2211,7 +2186,7 @@ tbody tr.inventory-row-partial:hover {
 .shipment-history-list {
   display: grid;
   gap: 6px;
-  color: #39649E;
+  color: #646464;
   font-size: 0.92rem;
 }
 
@@ -2236,9 +2211,9 @@ tbody tr.inventory-row-partial:hover {
   width: 100%;
   padding: 12px 14px;
   border-radius: 12px;
-  background: #F6F9FF;
-  border: 1px solid #DCE7F8;
-  color: #39649E;
+  background: #fafafa;
+  border: 1px solid #ececec;
+  color: #646464;
   font-size: 0.92rem;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -2253,10 +2228,10 @@ button.shipment-notes-copy {
   width: 100%;
   min-height: 110px;
   padding: 12px 14px;
-  border: 1px solid #C6D8F2;
+  border: 1px solid #e2e2e2;
   border-radius: 12px;
-  background: #F6F9FF;
-  color: #0F3470;
+  background: #fafafa;
+  color: #212121;
   font-size: 0.92rem;
   line-height: 1.5;
   resize: vertical;
@@ -2265,8 +2240,8 @@ button.shipment-notes-copy {
 
 .shipment-notes-editor:focus {
   outline: none;
-  border-color: #0069F2;
-  box-shadow: 0 0 0 3px rgba(0, 105, 242, 0.12);
+  border-color: #116dff;
+  box-shadow: 0 0 0 3px rgba(17, 109, 255, 0.10);
 }
 
 .shipment-distribution-card {
@@ -2308,7 +2283,7 @@ button.shipment-notes-copy {
   display: grid;
   place-content: center;
   text-align: center;
-  color: #0F3470;
+  color: #212121;
 }
 
 .shipment-distribution-center strong {
@@ -2316,7 +2291,7 @@ button.shipment-notes-copy {
 }
 
 .shipment-distribution-center span {
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.82rem;
 }
 
@@ -2325,19 +2300,19 @@ button.shipment-notes-copy {
   gap: 4px;
   padding: 12px;
   border-radius: 12px;
-  background: #F6F9FF;
-  border: 1px solid #DCE7F8;
-  color: #39649E;
+  background: #fafafa;
+  border: 1px solid #ececec;
+  color: #646464;
   font-size: 0.9rem;
 }
 
 .shipment-distribution-tooltip strong {
-  color: #0F3470;
+  color: #212121;
 }
 
 .shipment-distribution-empty {
   margin: 0;
-  color: #5B7FA8;
+  color: #8f8f8f;
 }
 
 .shipment-filter-panel {
@@ -2345,7 +2320,7 @@ button.shipment-notes-copy {
 }
 
 .shipment-filter-label {
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.8rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -2360,7 +2335,7 @@ button.shipment-notes-copy {
 }
 
 .shipment-status-label {
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.8rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -2372,9 +2347,9 @@ button.shipment-notes-copy {
   min-width: 180px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid #C6D8F2;
+  border: 1px solid #e2e2e2;
   background: rgba(255, 255, 255, 0.85);
-  color: #0F3470;
+  color: #212121;
   font-weight: 700;
   text-align: center;
 }
@@ -2395,15 +2370,15 @@ button.shipment-notes-copy {
 }
 
 .filter-toggle-button.is-active {
-  border-color: #0F3470;
-  box-shadow: 0 0 0 2px rgba(0, 26, 74, 0.18);
-  color: #0F3470;
+  border-color: #212121;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.12);
+  color: #212121;
 }
 
 .shipment-status-select:focus {
   outline: none;
-  border-color: #0069F2;
-  box-shadow: 0 0 0 3px rgba(0, 105, 242, 0.12);
+  border-color: #116dff;
+  box-shadow: 0 0 0 3px rgba(17, 109, 255, 0.10);
 }
 
 .shipment-card-actions {
@@ -2414,12 +2389,12 @@ button.shipment-notes-copy {
 
 .shipment-card-header h3 {
   margin: 0;
-  color: #0F3470;
+  color: #212121;
 }
 
 .shipment-card-subline {
   margin: 6px 0 0;
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.95rem;
 }
 
@@ -2433,21 +2408,21 @@ button.shipment-notes-copy {
 .shipment-meta-item {
   padding: 10px 12px;
   border-radius: 12px;
-  background: #F6F9FF;
-  border: 1px solid #DCE7F8;
+  background: #fafafa;
+  border: 1px solid #ececec;
 }
 
 .shipment-meta-item span {
   display: block;
   margin-bottom: 4px;
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .shipment-meta-item strong {
-  color: #0F3470;
+  color: #212121;
 }
 
 .shipment-inline-edit {
@@ -2455,7 +2430,7 @@ button.shipment-notes-copy {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  color: #0F3470;
+  color: #212121;
 }
 
 .shipment-inline-field {
@@ -2466,7 +2441,7 @@ button.shipment-notes-copy {
 }
 
 .shipment-inline-label {
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-weight: 700;
   min-width: max-content;
 }
@@ -2475,23 +2450,23 @@ button.shipment-notes-copy {
 .shipment-inline-select {
   min-width: 220px;
   padding: 8px 10px;
-  border: 1px solid #C6D8F2;
+  border: 1px solid #e2e2e2;
   border-radius: 10px;
   background: #ffffff;
-  color: #0F3470;
+  color: #212121;
 }
 
 .shipment-inline-input:focus,
 .shipment-inline-select:focus {
   outline: none;
-  border-color: #0069F2;
-  box-shadow: 0 0 0 3px rgba(0, 105, 242, 0.12);
+  border-color: #116dff;
+  box-shadow: 0 0 0 3px rgba(17, 109, 255, 0.10);
 }
 
 .edit-icon-button {
   border: 0;
   background: transparent;
-  color: #39649E;
+  color: #646464;
   cursor: pointer;
   font-size: 0.95rem;
   line-height: 1;
@@ -2500,12 +2475,12 @@ button.shipment-notes-copy {
 }
 
 .edit-icon-button:hover {
-  color: #0F3470;
+  color: #212121;
 }
 
 .shipment-empty {
   margin: 14px 0 0;
-  color: #5B7FA8;
+  color: #8f8f8f;
 }
 
 .shipment-line-items {
@@ -2520,9 +2495,9 @@ button.shipment-notes-copy {
   justify-content: space-between;
   gap: 16px;
   padding: 12px 14px;
-  border: 1px solid #DCE7F8;
+  border: 1px solid #ececec;
   border-radius: 12px;
-  background: #F6F9FF;
+  background: #fafafa;
 }
 
 .shipment-line-items-filter-bar .shipment-filter-label {
@@ -2540,8 +2515,8 @@ button.shipment-notes-copy {
 .shipment-line-item {
   padding: 8px 10px;
   border-radius: 10px;
-  background: #F6F9FF;
-  border: 1px solid #DCE7F8;
+  background: #fafafa;
+  border: 1px solid #ececec;
 }
 
 .shipment-line-item.is-consolidated {
@@ -2580,11 +2555,11 @@ button.shipment-notes-copy {
 .shipment-line-middle {
   display: grid;
   gap: 6px;
-  color: #0F3470;
+  color: #212121;
 }
 
 .shipment-line-middle span {
-  color: #5B7FA8;
+  color: #8f8f8f;
 }
 
 .shipment-request-conflict {
@@ -2595,7 +2570,7 @@ button.shipment-notes-copy {
 }
 
 .shipment-request-summary {
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.88rem;
   font-weight: 700;
   line-height: 1.35;
@@ -2604,15 +2579,15 @@ button.shipment-notes-copy {
 .shipment-line-pricing {
   display: grid;
   gap: 6px;
-  color: #5B7FA8;
+  color: #8f8f8f;
 }
 
 .requested-units-button {
   justify-self: start;
-  border: 1px solid #C6D8F2;
+  border: 1px solid #e2e2e2;
   border-radius: 10px;
-  background: #EDF3FF;
-  color: #1E4A8F;
+  background: #f4f4f4;
+  color: #2b2b2b;
   padding: 7px 10px;
   font-weight: 700;
   cursor: pointer;
@@ -2626,10 +2601,10 @@ button.shipment-notes-copy {
 }
 
 .consolidated-button {
-  border: 1px solid #C6D8F2;
+  border: 1px solid #e2e2e2;
   border-radius: 10px;
-  background: #EDF3FF;
-  color: #1E4A8F;
+  background: #f4f4f4;
+  color: #2b2b2b;
   padding: 8px 10px;
   font-weight: 700;
   cursor: pointer;
@@ -2660,17 +2635,17 @@ button.shipment-notes-copy {
 }
 
 .shipment-line-label {
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.74rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .ready-button {
-  border: 1px solid #C6D8F2;
+  border: 1px solid #e2e2e2;
   border-radius: 10px;
-  background: #EDF3FF;
-  color: #1E4A8F;
+  background: #f4f4f4;
+  color: #2b2b2b;
   padding: 6px 8px;
   font-weight: 700;
   cursor: pointer;
@@ -2700,8 +2675,8 @@ button.shipment-notes-copy {
   padding: 22px;
   border-radius: 20px;
   background: #ffffff;
-  border: 1px solid #DCE7F8;
-  box-shadow: 0 24px 60px rgba(0, 26, 74, 0.18);
+  border: 1px solid #ececec;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.12);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -2726,9 +2701,9 @@ button.shipment-notes-copy {
   gap: 14px;
   align-items: stretch;
   padding: 14px;
-  border: 1px solid #DCE7F8;
+  border: 1px solid #ececec;
   border-radius: 14px;
-  background: #F6F9FF;
+  background: #fafafa;
 }
 
 .shipment-value-month-heading {
@@ -2746,7 +2721,7 @@ button.shipment-notes-copy {
 
 .shipment-value-month-heading span,
 .shipment-value-month-empty {
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.82rem;
 }
 
@@ -2769,15 +2744,15 @@ button.shipment-notes-copy {
   border: 1px solid var(--brand-ink);
   border-radius: 12px;
   background: var(--brand-ink);
-  color: #CBDBFF;
+  color: #eaf1ff;
   text-align: left;
   cursor: pointer;
 }
 
 .shipment-value-point-card:hover,
 .shipment-value-point-card:focus-visible {
-  border-color: #0069F2;
-  background: #0039A4;
+  border-color: #116dff;
+  background: #0337a3;
   box-shadow: 0 8px 18px rgba(0, 53, 162, 0.28);
   outline: none;
 }
@@ -2819,14 +2794,14 @@ button.shipment-notes-copy {
 .shipment-modal-header h2 {
   margin: 0;
   font-family: var(--bp-display);
-  color: #0F3470;
+  color: #212121;
   font-size: 1.35rem;
 }
 
 .modal-close {
   border: 0;
   background: transparent;
-  color: #39649E;
+  color: #646464;
   cursor: pointer;
   font-size: 1.1rem;
 }
@@ -2839,7 +2814,7 @@ button.shipment-notes-copy {
 
 .modal-item-name {
   margin: 0;
-  color: #0F3470;
+  color: #212121;
   font-weight: 700;
 }
 
@@ -2856,7 +2831,7 @@ button.shipment-notes-copy {
 }
 
 .modal-field span {
-  color: #39649E;
+  color: #646464;
   font-weight: 700;
 }
 
@@ -2866,10 +2841,10 @@ button.shipment-notes-copy {
 }
 
 .modal-shortcut-button {
-  border: 1px solid #C6D8F2;
+  border: 1px solid #e2e2e2;
   border-radius: 10px;
-  background: #EDF3FF;
-  color: #1E4A8F;
+  background: #f4f4f4;
+  color: #2b2b2b;
   padding: 6px 10px;
   font-size: 0.85rem;
   font-weight: 700;
@@ -2877,12 +2852,12 @@ button.shipment-notes-copy {
 }
 
 .modal-shortcut-button:hover {
-  background: #DCE7F8;
+  background: #ececec;
 }
 
 .modal-helper-note {
   margin: 6px 0 0;
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.9rem;
 }
 
@@ -2891,10 +2866,10 @@ button.shipment-notes-copy {
 .modal-field textarea {
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid #C6D8F2;
+  border: 1px solid #e2e2e2;
   border-radius: 14px;
-  background: #F6F9FF;
-  color: #0F3470;
+  background: #fafafa;
+  color: #212121;
 }
 
 .modal-field textarea {
@@ -2918,8 +2893,8 @@ button.shipment-notes-copy {
 .details-item {
   padding: 12px;
   border-radius: 12px;
-  background: #F6F9FF;
-  border: 1px solid #DCE7F8;
+  background: #fafafa;
+  border: 1px solid #ececec;
 }
 
 .details-item.full {
@@ -2929,14 +2904,14 @@ button.shipment-notes-copy {
 .details-item span {
   display: block;
   margin-bottom: 6px;
-  color: #5B7FA8;
+  color: #8f8f8f;
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .details-item strong {
-  color: #0F3470;
+  color: #212121;
   word-break: break-word;
 }
 
@@ -2948,7 +2923,7 @@ button.shipment-notes-copy {
   max-width: 100%;
   max-height: 280px;
   border-radius: 14px;
-  border: 1px solid #DCE7F8;
+  border: 1px solid #ececec;
   object-fit: contain;
   background: #ffffff;
 }
@@ -2957,11 +2932,10 @@ button.shipment-notes-copy {
 .secondary-button {
   border-radius: 4px;
   padding: 10px 16px;
-  font-family: var(--bp-mono);
-  font-size: 0.74rem;
+  font-family: var(--bp-body);
+  font-size: 0.78rem;
   font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  letter-spacing: 0.04em;
   cursor: pointer;
 }
 
@@ -2986,7 +2960,7 @@ button.shipment-notes-copy {
 
 .secondary-button {
   border: 1px solid var(--brand-light);
-  background: #EDF3FF;
+  background: #f4f4f4;
   color: var(--brand-dark);
 }
 
@@ -3096,29 +3070,23 @@ textarea:focus-visible {
   }
 }
 
-/* Only measured values take the mono face. Supply names, categories and notes
-   stay in the body face, where long strings are easier to read. */
-.inventory-results tbody td:nth-child(n + 7),
-.shipment-kpi-table td:nth-child(n + 3),
+/* Dates and history lines keep tabular figures so they stay aligned. */
 .expiration-cell > span:first-child,
 .shipment-expiration > span:first-child,
 .shipment-item-id-row > strong,
 .shipment-history-list span,
-.non-inventory-shipment-details dd,
-.title-block-value {
-  font-family: var(--bp-mono);
+.non-inventory-shipment-details dd {
   font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum" 1;
 }
 
 /* Column headers in the drafting annotation voice. */
 thead th {
-  font-family: var(--bp-mono);
-  font-size: 0.68rem;
+  font-family: var(--bp-body);
+  font-size: 0.7rem;
   font-weight: 600;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: var(--bp-ink-soft);
+  color: var(--bp-ink-faint);
 }
 
 /* Respect a reduced-motion preference across the whole sheet. */
