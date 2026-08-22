@@ -153,6 +153,20 @@ def normalize_expiration_date(value: Any) -> str:
     return None
 
 
+def read_category(row: Dict[str, Any]) -> Any:
+    """Return the raw category cell, tolerating the sheet's column renames.
+
+    The live tab labels the approved-category column "Subcategories"; older tabs
+    used "Category"/"Subcategory". Pick the first one that has a value.
+    """
+    for header in ("Subcategories", "Subcategory", "Category"):
+        value = str(row.get(header) or "").strip()
+        if value:
+            return value
+
+    return ""
+
+
 def normalize_category(value: Any) -> str:
     raw = str(value or "").strip()
     if raw in APPROVED_CATEGORIES:
@@ -319,7 +333,7 @@ def fetch_items_from_sheet() -> List[Item]:
         try:
             name = (row.get("Name") or "").strip()
             manufacturer = (row.get("Manufacturer Name") or "").strip()
-            category = normalize_category(row.get("Category"))
+            category = normalize_category(read_category(row))
 
             if not any([name, manufacturer, category]):
                 continue
