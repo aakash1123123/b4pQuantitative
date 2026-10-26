@@ -1,0 +1,331 @@
+/* ============================================================
+   Glass theme
+   Frosted, translucent surfaces over a soft brand-blue backdrop,
+   pill navigation, and dark navy for active state. Layered on top
+   of styles.css so the base rules stay intact; remove the import in
+   main.jsx to switch it off.
+   ============================================================ */
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.52);
+  --glass-bg-strong: rgba(255, 255, 255, 0.72);
+  --glass-bg-inner: rgba(255, 255, 255, 0.5);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-line: rgba(0, 14, 63, 0.08);
+  --glass-shadow: 0 10px 40px rgba(0, 14, 63, 0.08), 0 1px 2px rgba(0, 14, 63, 0.04);
+  --glass-blur: blur(22px) saturate(160%);
+  --glass-radius: 26px;
+  --glass-radius-inner: 18px;
+
+  --page-background: #e9efff;
+  --bp-sheet: #e9efff;
+}
+
+/* --- backdrop: soft brand-blue light behind the glass --- */
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(60vw 50vh at 8% 0%, rgba(0, 105, 243, 0.28), transparent 70%),
+    radial-gradient(50vw 55vh at 100% 15%, rgba(203, 219, 255, 0.95), transparent 70%),
+    radial-gradient(55vw 50vh at 85% 100%, rgba(55, 60, 130, 0.22), transparent 70%),
+    radial-gradient(45vw 45vh at 0% 95%, rgba(0, 53, 162, 0.16), transparent 70%),
+    linear-gradient(160deg, #f4f7ff 0%, #e4ecff 55%, #dfe6fb 100%);
+  background-attachment: fixed;
+}
+
+/* --- frosted surfaces --- */
+.top-bar,
+.panel,
+.summary-card,
+.filters-sidebar,
+.shipment-modal,
+.pallet-modal,
+.inventory-kpi-modal,
+.filter-drawer {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+.shipment-modal,
+.pallet-modal,
+.inventory-kpi-modal,
+.filter-drawer {
+  background: var(--glass-bg-strong);
+}
+
+/* Cards that sit inside a glass panel: lighter, no second blur. */
+.metric-card,
+.shipment-card,
+.shipment-card-planning,
+.shipment-subpanel,
+.expiry-chart-card,
+.pallet-mini-chart-card,
+.kpi-note-card,
+.analytics-placeholder-card,
+.shipment-distribution-card,
+.pallet-map-card,
+.pallet-modal-metric-card,
+.shipment-status-panel,
+.shipment-notes-panel,
+.non-inventory-shipment-card,
+.shipment-line-item,
+.table-wrap {
+  background: var(--glass-bg-inner);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius-inner);
+  box-shadow: 0 1px 2px rgba(0, 14, 63, 0.04);
+}
+
+.metric-card {
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(0, 14, 63, 0.1);
+}
+
+.metric-value {
+  font-family: var(--bp-display);
+  font-weight: 500;
+  color: var(--bp-heading);
+  letter-spacing: -0.01em;
+}
+
+/* --- header --- */
+.top-bar {
+  overflow: hidden;
+}
+
+.top-bar::after {
+  display: none;
+}
+
+.title-block-cell {
+  border-color: var(--glass-line);
+}
+
+.title-block-logo {
+  background: transparent;
+  border-left-color: var(--glass-line);
+}
+
+/* --- tabs: one frosted pill bar, dark pill for the active tab --- */
+.tabs-section {
+  margin-bottom: 18px;
+}
+
+.tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--glass-bg-strong);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+.tab-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 20px;
+  background: transparent;
+  color: var(--bp-heading);
+}
+
+.tab-button:hover {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.tab-button.active,
+.tab-button.active:hover {
+  background: var(--bp-heading);
+  color: #ffffff;
+}
+
+.tab-button.active::before {
+  display: none;
+}
+
+/* Shipments sub-tabs follow the same pill pattern. */
+.shipment-subtab,
+.shipment-kpi-subtabs button {
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--glass-bg-inner);
+  color: var(--bp-heading);
+}
+
+.shipment-subtab.active {
+  background: var(--bp-heading);
+  border-color: var(--bp-heading);
+  color: #ffffff;
+}
+
+/* --- buttons and controls --- */
+.primary-button,
+.secondary-button,
+.filter-toggle-button,
+.inventory-filter-button,
+.clear-filters {
+  border-radius: 999px;
+}
+
+.primary-button {
+  background: var(--bp-heading);
+  border-color: var(--bp-heading);
+}
+
+.primary-button:hover:not(:disabled) {
+  background: var(--bp-blue);
+  border-color: var(--bp-blue);
+}
+
+.primary-button:disabled {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: var(--glass-border);
+}
+
+.secondary-button {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: var(--glass-border);
+  color: var(--bp-heading);
+}
+
+.secondary-button:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: var(--bp-blue-tint);
+}
+
+.search-input,
+.shipment-filter-select,
+.shipment-status-select,
+.shipment-inline-input,
+.shipment-inline-select {
+  border-color: var(--glass-border);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.search-input {
+  border-radius: 999px;
+}
+
+.pill,
+.status-pill,
+.expiration-pill,
+.shipment-status-badge,
+.filter-count {
+  border-radius: 999px;
+}
+
+/* --- tables --- */
+.table-wrap {
+  overflow: hidden;
+}
+
+thead th {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+tbody tr {
+  border-color: var(--glass-line);
+}
+
+tbody tr:hover {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+td,
+th {
+  border-color: var(--glass-line);
+}
+
+/* Without backdrop-filter support, fall back to near-opaque surfaces. */
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .top-bar,
+  .panel,
+  .summary-card,
+  .filters-sidebar,
+  .tabs {
+    background: rgba(255, 255, 255, 0.92);
+  }
+}
+
+/* ============================================================
+   Gradients
+   Navy-to-blue fills for active and primary controls, gradient
+   numerals for headline figures, and a light top-left sheen on
+   glass surfaces.
+   ============================================================ */
+:root {
+  --grad-brand: linear-gradient(135deg, #000e3f 0%, #0035a2 55%, #0069f3 100%);
+  --grad-brand-hover: linear-gradient(135deg, #0035a2 0%, #0069f3 100%);
+  --grad-text: linear-gradient(120deg, #000e3f 0%, #0035a2 45%, #0069f3 100%);
+  --grad-sheen: linear-gradient(145deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.25) 45%, rgba(203, 219, 255, 0.35) 100%);
+}
+
+.tab-button.active,
+.tab-button.active:hover,
+.shipment-subtab.active,
+.primary-button {
+  background: var(--grad-brand);
+  border-color: transparent;
+  box-shadow: 0 6px 18px rgba(0, 53, 162, 0.28);
+}
+
+.primary-button:hover:not(:disabled) {
+  background: var(--grad-brand-hover);
+  border-color: transparent;
+}
+
+.primary-button:disabled {
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: none;
+}
+
+.metric-value,
+.title-block-value {
+  background: var(--grad-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.panel,
+.summary-card,
+.top-bar {
+  background-image: var(--grad-sheen);
+}
+
+.metric-card,
+.expiry-chart-card,
+.pallet-mini-chart-card,
+.shipment-card,
+.shipment-distribution-card,
+.kpi-note-card {
+  background-image: linear-gradient(160deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.35) 100%);
+}
+
+/* Gradient hairline along the top of the header. */
+.top-bar::after {
+  display: block;
+  height: 3px;
+  background: var(--grad-brand);
+}
+
+/* Size the gradient to the figure itself so short numbers still show it. */
+.metric-value,
+.title-block-value {
+  width: fit-content;
+}
+
+/* Secondary buttons sit on near-white cards; give them a visible edge. */
+.secondary-button {
+  border-color: rgba(0, 53, 162, 0.18);
+}
