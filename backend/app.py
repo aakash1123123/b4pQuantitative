@@ -31,7 +31,9 @@ app.add_middleware(
 # GOOGLE SHEET CONFIG
 # ==============================
 SHEET_ID = "1OiT1QBBnlazfRCv0MgwE_LXvIVJNAVQha1Ez7M4Vc88"
-SHEET_GID = "384285232"
+# The "Final Inventorying" tab: every inventoried item, all pallets. Box type
+# is column B ("Category"), pallet is J and box number is K.
+SHEET_GID = "1019735220"
 SHEET_URL = (
     f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export"
     f"?format=csv&gid={SHEET_GID}"
@@ -384,7 +386,7 @@ def fetch_items_from_sheet() -> List[Item]:
                 expiration_date=normalize_expiration_date(row.get("Date of Expiration")),
                 warehouse_date=warehouse_date,
                 pallet_number=parse_int(row.get("Pallet Number"), default=0),
-                category_box=(row.get("Box Category") or "").strip() or "Unassigned",
+                category_box=(row.get("Category") or row.get("Box Category") or "").strip() or "Unassigned",
                 box_number=parse_int(row.get("Box Number"), default=0),
             )
             items.append(item)
