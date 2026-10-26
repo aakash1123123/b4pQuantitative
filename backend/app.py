@@ -45,6 +45,19 @@ HISTORY_SHEET_URL = (
     f"https://docs.google.com/spreadsheets/d/{HISTORY_SHEET_ID}/export"
     f"?format=csv&gid={HISTORY_SHEET_GID}"
 )
+# "Form Responses 1" tab of the inventory Sheet: the intake form is the
+# source of truth for where each item sits. Columns are read by position
+# (B image, E pallet, F box number, I box type) since the headers vary.
+FORM_SHEET_GID = "599685269"
+FORM_SHEET_URL = (
+    f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export"
+    f"?format=csv&gid={FORM_SHEET_GID}"
+)
+FORM_IMAGE_COL = 1
+FORM_PALLET_COL = 4
+FORM_BOX_NUMBER_COL = 5
+FORM_BOX_TYPE_COL = 8
+
 HISTORY_SNAPSHOT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "history_snapshot.json")
 
 APPROVED_CATEGORIES = {
@@ -342,6 +355,56 @@ def update_sheet_quantity(item_id: str, quantity: int) -> QuantityUpdateResponse
 # ==============================
 # FETCH DATA FROM GOOGLE SHEETS
 # ==============================
+DRIVE_ID_PATTERN = re.compile(r"(?:[?&]id=|/d/)([A-Za-z0-9_-]{10,})")
+FORM_NUMBER_PATTERN = re.compile(r"^#?\s*(\d{1,3})$")
+
+
+def drive_file_id(url: Any) -> Optional[str]:
+    """The Google Drive file ID in an image link, whichever link style it uses."""
+    match = DRIVE_ID_PATTERN.search(str(url or ""))
+    return match.group(1) if match else None
+
+
+def parse_form_number(value: Any) -> Optional[int]:
+    """A pallet or box number typed into the form; None for blanks and notes like 'NA'."""
+    match = FORM_NUMBER_PATTERN.match(str(value or "").strip())
+    if not match:
+        return None
+    number = int(match.group(1))
+    return number if number > 0 else None
+
+
+def fetch_form_locations() -> Dict[str, Dict[str, Any]]:
+    """Pallet, box number and box type per Drive image ID, from Form Responses 1.
+
+    Returns an empty map if the tab can't be read, so items fall back to the
+    values on the inventory tab.
+    """
+    try:
+        response = requests.get(FORM_SHEET_URL, timeout=15)
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        print(f"Unable to load form responses: {exc}")
+        return {}
+
+    rows = csv.reader(StringIO(response.text))
+    next(rows, None)
+    locations: Dict[str, Dict[str, Any]] = {}
+    for row in rows:
+        if len(row) <= FORM_IMAGE_COL:
+            continue
+        file_id = drive_file_id(row[FORM_IMAGE_COL])
+        if not file_id:
+            continue
+        cell = lambda col: row[col] if len(row) > col else ""
+        locations[file_id] = {
+            "pallet_number": parse_form_number(cell(FORM_PALLET_COL)),
+            "box_number": parse_form_number(cell(FORM_BOX_NUMBER_COL)),
+            "box_type": cell(FORM_BOX_TYPE_COL).strip() or None,
+        }
+    return locations
+
+
 def fetch_items_from_sheet() -> List[Item]:
     try:
         response = requests.get(SHEET_URL, timeout=15)
@@ -352,6 +415,8 @@ def fetch_items_from_sheet() -> List[Item]:
     csv_data = StringIO(response.text)
     reader = csv.DictReader(csv_data)
     today = datetime.now().date()
+
+    form_locations = fetch_form_locations()
 
     items = []
     for index, row in enumerate(reader, start=1):
@@ -368,6 +433,8 @@ def fetch_items_from_sheet() -> List[Item]:
             quantity = parse_int(row.get("Quantity"))
             unit_value = parse_float(row.get("Price per unit"), parse_float(row.get("Unit Value")))
             total_value = parse_float(row.get("Total Price"), parse_float(row.get("Total Value"), quantity * unit_value))
+            image_url = (row.get("Image URL") or "").strip() or None
+            location = form_locations.get(drive_file_id(image_url), {})
 
             item = Item(
                 id=normalize_item_id(row, index),
@@ -377,15 +444,15 @@ def fetch_items_from_sheet() -> List[Item]:
                 manufacturer=manufacturer or "Unknown",
                 review_status=(row.get("Review") or "").strip() or None,
                 days_in_warehouse=days_in_warehouse,
-                image_url=(row.get("Image URL") or "").strip() or None,
+                image_url=image_url,
                 quantity=quantity,
                 unit_value=unit_value,
                 total_value=total_value,
                 expiration_date=normalize_expiration_date(row.get("Date of Expiration")),
                 warehouse_date=warehouse_date,
-                pallet_number=parse_int(row.get("Pallet Number"), default=0),
-                category_box=(row.get("Box Category") or "").strip() or "Unassigned",
-                box_number=parse_int(row.get("Box Number"), default=0),
+                pallet_number=location.get("pallet_number") or parse_int(row.get("Pallet Number"), default=0),
+                category_box=location.get("box_type") or (row.get("Box Category") or "").strip() or "Unassigned",
+                box_number=location.get("box_number") or parse_int(row.get("Box Number"), default=0),
             )
             items.append(item)
         except Exception as e:
