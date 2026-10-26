@@ -388,6 +388,18 @@ function formatCurrency(value) {
   }).format(value ?? 0);
 }
 
+// Short form for big numbers on tiles ($10.2M, 261K); the exact figure goes in a tooltip.
+function formatCompactNumber(value, prefix = "") {
+  const number = Number(value) || 0;
+  if (Math.abs(number) < 10000) {
+    return `${prefix}${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(number)}`;
+  }
+  return `${prefix}${new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumSignificantDigits: 3,
+  }).format(number)}`;
+}
+
 function formatWholeCurrency(value) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -965,7 +977,7 @@ function PieChartCard({
 
   return (
     <div className={`expiry-chart-card compact ${cardClassName}`.trim()}>
-      <h4>{title}</h4>
+      {title ? <h4>{title}</h4> : null}
       <div className="expiration-pie-layout">
         <div className="expiration-pie-wrap">
           <div
@@ -1402,7 +1414,6 @@ export default function App() {
   const [activeDurationPieLabel, setActiveDurationPieLabel] = useState(null);
   const [activeCategoryPieLabel, setActiveCategoryPieLabel] = useState(null);
   const [activeValuePieLabel, setActiveValuePieLabel] = useState(null);
-  const [activeBoxCategoryPieLabel, setActiveBoxCategoryPieLabel] = useState(null);
   const [activeSupplyStatusPieLabel, setActiveSupplyStatusPieLabel] = useState(null);
   const [isAllInventoryKpisOpen, setIsAllInventoryKpisOpen] = useState(false);
   const [isAllShipmentKpisOpen, setIsAllShipmentKpisOpen] = useState(false);
@@ -1794,6 +1805,14 @@ export default function App() {
   }, [draggingPallet, isEditingPalletMap]);
 
   const visiblePalletLayout = isEditingPalletMap ? draftPalletLayout : savedPalletLayout;
+  // Outside edit mode the map is only as tall as its lowest pallet, not the full canvas.
+  const palletMapFitHeight =
+    Math.max(
+      0,
+      ...Object.values(visiblePalletLayout || {}).map((position) => position?.y || 0)
+    ) +
+    PALLET_CARD_SIZE.height +
+    PALLET_MAP_GAP * 2;
 
   function matchesSelectedFilter(selectedValues, rowValue) {
     return selectedValues.length === 0 || selectedValues.includes(rowValue);
@@ -2847,36 +2866,6 @@ export default function App() {
   const valueBucketPieSegments = buildPieChartSegments(
     valueBucketLegendData.filter((segment) => segment.value > 0)
   );
-  const boxCategoryChartData = buildFacetCounts(inventoryRowsWithShipmentStatus, "boxType")
-    .map((bucket, index) => {
-      const matchingRows = inventoryRowsWithShipmentStatus.filter((row) => row.boxType === bucket.value);
-      const uniqueBoxes = new Set(
-        matchingRows.map((row) => `${row.palletNumber}|${row.boxType}|${row.boxNumber}`)
-      );
-      const rawItems = matchingRows.reduce((total, row) => total + (row.quantity || 0), 0);
-
-      return {
-        label: bucket.value,
-        value: rawItems,
-        boxCount: uniqueBoxes.size,
-        color: colorForBoxType(index),
-      };
-    });
-  const totalBoxCategoryItems = boxCategoryChartData.reduce(
-    (total, segment) => total + segment.value,
-    0
-  );
-  const boxCategoryLegendData = boxCategoryChartData.map((segment) => ({
-    ...segment,
-    total: totalBoxCategoryItems,
-    percentage: percentOfTotal(segment.value, totalBoxCategoryItems),
-  }));
-  const boxCategoryPieBackground = buildPieChartBackground(
-    boxCategoryLegendData.filter((segment) => segment.value > 0)
-  );
-  const boxCategoryPieSegments = buildPieChartSegments(
-    boxCategoryLegendData.filter((segment) => segment.value > 0)
-  );
   const supplyStatusChartData = supplyStatusOrder.map((statusLabel) => {
     const matchingRows = inventoryRowsWithShipmentStatus.filter(
       (row) => row.supplyWorkflowStatus === statusLabel
@@ -3286,8 +3275,12 @@ export default function App() {
                 <dd>
                   <strong>{formatNumber(entry.count)}</strong> shipments
                 </dd>
-                <dd>{formatWholeCurrency(entry.valuation)} donated</dd>
-                <dd>{formatNumber(Math.round(entry.pounds))} lbs</dd>
+                <dd title={formatWholeCurrency(entry.valuation)}>
+                  {formatCompactNumber(entry.valuation, "$")} donated
+                </dd>
+                <dd title={`${formatNumber(Math.round(entry.pounds))} lbs`}>
+                  {formatCompactNumber(entry.pounds)} lbs
+                </dd>
               </div>
             ))}
           </dl>
@@ -3376,14 +3369,23 @@ export default function App() {
         </div>
       </section>
 
-      {loading ? <div className="panel">Loading dashboard data...</div> : null}
+      {loading ? (
+        <section className="panel skeleton-panel" aria-busy="true" aria-label="Loading dashboard data">
+          <div className="skeleton skeleton-title" />
+          <div className="skeleton-row">
+            <div className="skeleton skeleton-tile" />
+            <div className="skeleton skeleton-tile" />
+            <div className="skeleton skeleton-tile" />
+          </div>
+          <div className="skeleton skeleton-chart" />
+        </section>
+      ) : null}
       {error ? <div className="panel error-panel">{error}</div> : null}
 
       {!loading && !error && activeTab === "inventory" ? (
         <section className="panel">
           <div className="panel-header">
             <div>
-              <p className="section-label">Total Inventory</p>
               <h2>Every supply as a line item</h2>
             </div>
             <div className="inventory-actions">
@@ -3824,7 +3826,6 @@ export default function App() {
         <section className="panel">
           <div className="panel-header">
             <div>
-              <p className="section-label">Inventory KPIs</p>
               <h2>Current operating snapshot</h2>
             </div>
             <button
@@ -3849,14 +3850,12 @@ export default function App() {
             <div className="summary-card kpi-card-full">
               <div className="panel-header">
                 <div>
-                  <p className="section-label">Expiration Summary</p>
                   <h3>Inventory at a glance by expiration window</h3>
                 </div>
               </div>
 
               {expirationChartData.length > 0 ? (
                 <PieChartCard
-                  title="Supplies by expiration bucket"
                   ariaLabel="Pie chart of inventory by expiration bucket"
                   totalItems={totalExpirationChartItems}
                   segments={expirationPieSegments}
@@ -3876,7 +3875,6 @@ export default function App() {
             <div className="summary-card kpi-card-full">
               <div className="panel-header">
                 <div>
-                  <p className="section-label">Category Summary</p>
                   <h3>Inventory at a glance by supply category</h3>
                 </div>
                 <span className="pill">{formatNumber(uniqueCategories)} categories</span>
@@ -3884,7 +3882,6 @@ export default function App() {
 
               {categoryChartLegendData.length > 0 ? (
                 <PieChartCard
-                  title="Supplies by category"
                   ariaLabel="Pie chart of inventory by supply category"
                   totalItems={totalCategoryChartItems}
                   segments={categoryPieSegments}
@@ -3902,17 +3899,15 @@ export default function App() {
               )}
             </div>
 
-            <div className="summary-card kpi-card-half">
+            <div className="summary-card kpi-card-full">
               <div className="panel-header">
                 <div>
-                  <p className="section-label">Value Summary</p>
                   <h3>Inventory by unit price bucket</h3>
                 </div>
               </div>
 
               {valueBucketLegendData.length > 0 ? (
                 <PieChartCard
-                  title="Supplies by price per unit"
                   ariaLabel="Pie chart of inventory by price per unit bucket"
                   totalItems={totalValueBucketItems}
                   segments={valueBucketPieSegments}
@@ -3930,43 +3925,11 @@ export default function App() {
               )}
             </div>
 
-            <div className="summary-card kpi-card-half">
-              <div className="panel-header">
-                <div>
-                  <p className="section-label">Box Category</p>
-                  <h3>Inventory by box category</h3>
-                </div>
-              </div>
-
-              {boxCategoryLegendData.length > 0 ? (
-                <PieChartCard
-                  title="Supplies by box category"
-                  ariaLabel="Pie chart of inventory by box category"
-                  totalItems={totalBoxCategoryItems}
-                  segments={boxCategoryPieSegments}
-                  legendSegments={boxCategoryLegendData}
-                  background={boxCategoryPieBackground}
-                  activeLabel={activeBoxCategoryPieLabel}
-                  onHover={setActiveBoxCategoryPieLabel}
-                  cardClassName="kpi-compact-card"
-                  onSegmentClick={(segment) =>
-                    openChartSegmentInInventory("box", segment.label)
-                  }
-                  renderLegendDetail={(segment) =>
-                    `${formatNumber(segment.value)} items • ${segment.percentage}% of raw items • ${formatNumber(segment.boxCount)} boxes`
-                  }
-                />
-              ) : (
-                <p>No box category data is available yet.</p>
-              )}
-            </div>
-
           </div>
 
           <div className="summary-card pallet-map-card">
             <div className="panel-header">
               <div>
-                <p className="section-label">Pallet Map</p>
                 <h3>Warehouse pallet layout</h3>
               </div>
               <div className="pallet-map-actions">
@@ -3994,6 +3957,7 @@ export default function App() {
               <div
                 ref={palletMapRef}
                 className={isEditingPalletMap ? "pallet-map-canvas is-editing" : "pallet-map-canvas"}
+                style={isEditingPalletMap ? undefined : { minHeight: palletMapFitHeight }}
               >
                 {palletSummaries.map((summary) => {
                   const position = visiblePalletLayout[summary.id] || { x: 0, y: 0 };
@@ -4587,7 +4551,6 @@ export default function App() {
               <section className="non-inventory-shipments-section">
                 <div className="non-inventory-shipments-heading">
                   <div>
-                    <p className="section-label">Non-Inventory Shipments</p>
                     <h3>Document shipments outside inventory</h3>
                   </div>
                   <div className="non-inventory-heading-actions">
@@ -4638,7 +4601,6 @@ export default function App() {
                     {filteredNonInventoryShipments.map((shipment) => (
                       <article className="non-inventory-shipment-card" key={shipment.id}>
                         <div className="non-inventory-shipment-card-title">
-                          <p className="section-label">Non-Inventory Shipment</p>
                           <h3>{shipment.clinicName}</h3>
                         </div>
                         <dl className="non-inventory-shipment-details">
@@ -4911,7 +4873,6 @@ export default function App() {
         <section className="panel">
           <div className="panel-header">
             <div>
-              <p className="section-label">Shipment KPIs</p>
               <h2>Shipment activity and outbound flow</h2>
             </div>
           </div>
@@ -4947,7 +4908,6 @@ export default function App() {
             <div className="shipment-kpi-summary-pane">
               <div className="shipment-kpi-pane-header">
                 <div>
-                  <p className="section-label">KPI Summary</p>
                   <h3>Current shipment activity</h3>
                 </div>
                 <button
@@ -4969,7 +4929,6 @@ export default function App() {
             <div className="shipment-kpi-current-table-panel">
               <div className="shipment-kpi-pane-header">
                 <div>
-                  <p className="section-label">Current Shipments</p>
                   <h3>Active shipment overview</h3>
                 </div>
                 <button
@@ -5022,7 +4981,19 @@ export default function App() {
                     {currentShipments.length === 0 ? (
                       <tr>
                         <td colSpan="4" className="empty-state-cell">
-                          No current shipments.
+                          <div className="empty-state">
+                            <p>No active shipments right now.</p>
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              onClick={() => {
+                                setActiveTab("shipments");
+                                setActiveShipmentSubtab("current");
+                              }}
+                            >
+                              Start one on the Shipments tab
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ) : null}
@@ -5037,7 +5008,6 @@ export default function App() {
               <div className="summary-card shipment-status-card">
                 <div className="panel-header">
                   <div>
-                    <p className="section-label">Shipment Status</p>
                     <h3>Shipments by current status</h3>
                   </div>
                 </div>
@@ -5058,7 +5028,6 @@ export default function App() {
             <div className="shipment-flow-time-view">
           <div className="panel-header shipment-flow-metrics-header">
             <div>
-              <p className="section-label">Shipment flow time metrics</p>
               <h3>Shipment flow time metrics</h3>
             </div>
             <button
@@ -5107,7 +5076,6 @@ export default function App() {
           >
             <div className="shipment-modal-header">
               <div>
-                <p className="section-label">Add To Shipment</p>
                 <h2 id="shipment-modal-title">
                   Choose a shipment for {pendingShipmentItems.length} selected item
                   {pendingShipmentItems.length === 1 ? "" : "s"}
@@ -5224,7 +5192,6 @@ export default function App() {
           >
             <div className="shipment-modal-header">
               <div>
-                <p className="section-label">Shipped</p>
                 <h2 id="shipping-modal-title">Shipment details</h2>
               </div>
               <button type="button" className="modal-close" onClick={closeShippingModal}>
@@ -5351,7 +5318,6 @@ export default function App() {
           >
             <div className="shipment-modal-header">
               <div>
-                <p className="section-label">Create Shipment</p>
                 <h2 id="create-shipment-modal-title">New shipment details</h2>
               </div>
               <button type="button" className="modal-close" onClick={closeCreateShipmentModal}>
@@ -5453,7 +5419,6 @@ export default function App() {
           >
             <div className="shipment-modal-header">
               <div>
-                <p className="section-label">Non-Inventory Shipment</p>
                 <h2 id="non-inventory-shipment-modal-title">Document shipment details</h2>
               </div>
               <button type="button" className="modal-close" onClick={closeNonInventoryShipmentModal}>
@@ -5551,7 +5516,6 @@ export default function App() {
           >
             <div className="shipment-modal-header">
               <div>
-                <p className="section-label">Pallet Details</p>
                 <h2 id="pallet-modal-title">{activePalletSummary.label}</h2>
                 <div className="pallet-modal-metrics">
                   <div className="pallet-modal-metric-card">
@@ -5607,7 +5571,6 @@ export default function App() {
           >
             <div className="shipment-modal-header">
               <div>
-                <p className="section-label">Inventory KPIs</p>
                 <h2 id="inventory-kpi-modal-title">Full operating snapshot</h2>
               </div>
               <button
@@ -5669,7 +5632,6 @@ export default function App() {
           >
             <div className="shipment-modal-header">
               <div>
-                <p className="section-label">Shipment KPIs</p>
                 <h2 id="shipment-kpi-modal-title">Full shipment activity snapshot</h2>
               </div>
               <button
@@ -5742,7 +5704,6 @@ export default function App() {
           >
             <div className="shipment-modal-header">
               <div>
-                <p className="section-label">Shipment Flow Time Metrics</p>
                 <h2 id="shipment-flow-metrics-modal-title">All 10 flow-time metrics</h2>
               </div>
               <button
@@ -5782,7 +5743,6 @@ export default function App() {
           >
             <div className="shipment-modal-header">
               <div>
-                <p className="section-label">Supply Details</p>
                 <h2 id="details-modal-title">Supply #{detailsItem.supplyId}</h2>
               </div>
               <button type="button" className="modal-close" onClick={closeDetailsModal}>
@@ -5836,7 +5796,6 @@ export default function App() {
           >
             <div className="shipment-modal-header">
               <div>
-                <p className="section-label">Confirm Return</p>
                 <h2 id="return-to-inventory-modal-title">Move supply back to inventory?</h2>
               </div>
               <button type="button" className="modal-close" onClick={closeReturnToInventoryModal}>
@@ -5886,7 +5845,6 @@ export default function App() {
           >
             <div className="shipment-modal-header">
               <div>
-                <p className="section-label">Inventory Check</p>
                 <h2 id="return-all-to-inventory-modal-title">
                   Send all supplies back to inventory?
                 </h2>
@@ -5939,7 +5897,6 @@ export default function App() {
           >
             <div className="shipment-modal-header">
               <div>
-                <p className="section-label">Requested Units</p>
                 <h2 id="requested-units-modal-title">Adjust requested units</h2>
               </div>
               <button type="button" className="modal-close" onClick={closeRequestedUnitsModal}>
@@ -6004,7 +5961,6 @@ export default function App() {
           >
             <div className="shipment-modal-header">
               <div>
-                <p className="section-label">Consolidation Check</p>
                 <h2 id="consolidation-modal-title">
                   Have exactly {formatNumber(consolidationRequestedQuantity)} units been
                   consolidated?
@@ -6126,7 +6082,6 @@ export default function App() {
           >
             <div className="shipment-modal-header">
               <div>
-                <p className="section-label">Add Supplies</p>
                 <h2 id="add-supply-ids-modal-title">Add supplies via ID</h2>
               </div>
               <button type="button" className="modal-close" onClick={closeAddSupplyIdsModal}>
@@ -6178,7 +6133,6 @@ export default function App() {
           >
             <div className="shipment-modal-header">
               <div>
-                <p className="section-label">Delivered</p>
                 <h2 id="delivered-modal-title">Confirm delivered status</h2>
               </div>
               <button type="button" className="modal-close" onClick={closeDeliveredModal}>
@@ -6247,7 +6201,6 @@ export default function App() {
           >
             <div className="shipment-modal-header">
               <div>
-                <p className="section-label">Shipment Status Check</p>
                 <h2 id="revert-to-shipped-modal-title">Move this delivery back to Shipped?</h2>
               </div>
               <button type="button" className="modal-close" onClick={closeRevertToShippedModal}>
