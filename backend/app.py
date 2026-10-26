@@ -213,7 +213,7 @@ def get_gspread_worksheet():
     if gspread is None or Credentials is None:
         raise HTTPException(
             status_code=503,
-            detail="Google Sheets write support is not installed on the backend yet.",
+            detail="Google Sheets support (gspread) is not installed on the backend.",
         )
 
     credentials_path = os.getenv("GOOGLE_SHEETS_CREDENTIALS_PATH")
@@ -317,15 +317,31 @@ def update_sheet_quantity(item_id: str, quantity: int) -> QuantityUpdateResponse
 # ==============================
 # FETCH DATA FROM GOOGLE SHEETS
 # ==============================
-def fetch_items_from_sheet() -> List[Item]:
+def sheet_credentials_configured() -> bool:
+    return bool(os.getenv("GOOGLE_SHEETS_CREDENTIALS_JSON") or os.getenv("GOOGLE_SHEETS_CREDENTIALS_PATH"))
+
+
+def read_sheet_rows() -> List[Dict[str, Any]]:
+    # Prefer the service account so the sheet can stay private; fall back to
+    # the public CSV export when no credentials are configured.
+    if sheet_credentials_configured():
+        values = get_gspread_worksheet().get_all_values()
+        if not values:
+            return []
+        headers = values[0]
+        return [dict(zip(headers, row + [""] * (len(headers) - len(row)))) for row in values[1:]]
+
     try:
         response = requests.get(SHEET_URL, timeout=15)
         response.raise_for_status()
     except requests.RequestException as exc:
         raise HTTPException(status_code=502, detail=f"Unable to load Google Sheet: {exc}") from exc
 
-    csv_data = StringIO(response.text)
-    reader = csv.DictReader(csv_data)
+    return list(csv.DictReader(StringIO(response.text)))
+
+
+def fetch_items_from_sheet() -> List[Item]:
+    reader = read_sheet_rows()
     today = datetime.now().date()
 
     items = []
