@@ -176,10 +176,10 @@ function applyDashboardTooltips(root = document) {
 }
 
 const tabs = [
-  { id: "inventory", label: "Total Inventory" },
   { id: "kpis", label: "Inventory KPIs" },
   { id: "shipments", label: "Shipments" },
   { id: "shipment-kpis", label: "Shipment KPIs" },
+  { id: "inventory", label: "Total Inventory" },
 ];
 
 const defaultShipments = [
@@ -677,7 +677,7 @@ const durationBucketColors = {
   "0-30 days": "#93B5E4",
   "31-90 days": "#5C87CE",
   "91-180 days": "#2E5CB4",
-  "181-365 days": "#0337A3",
+  "181-365 days": "#0035a2",
   "365+ days": "#02245F",
   "Unknown duration": "#E2E2E2",
 };
@@ -696,7 +696,7 @@ const durationBucketOrder = [
 // brand azure, never cycled. Every slice also carries its name in the legend,
 // which is what keeps identity off colour alone.
 const categoryPiePalette = [
-  "#116DFF",
+  "#0069f3",
   "#B87F00",
   "#1E4FC4",
   "#4E9A00",
@@ -755,14 +755,14 @@ const supplyStatusOrder = ["Inventory", "Pulled", "Consolidated"];
 // moves from shelf to shipment. Validated ordinal.
 const supplyStatusColors = {
   Inventory: "#7FA9F5",
-  Pulled: "#116DFF",
-  Consolidated: "#0337A3",
+  Pulled: "#0069f3",
+  Consolidated: "#0035a2",
 };
 
 // Box categories are identity too; take the first six of the fixed order so a
 // box type keeps the same hue it has in the category chart.
 const boxCategoryPalette = [
-  "#116DFF",
+  "#0069f3",
   "#B87F00",
   "#1E4FC4",
   "#4E9A00",
