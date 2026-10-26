@@ -3,7 +3,9 @@ import "./DonationHistory.css";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 const COUNT_UP_MS = 1800;
-const BAR_STAGGER_MS = 140;
+const LINE_DRAW_MS = 2600;
+// Leave headroom above the highest point for its value label.
+const PLOT_TOP = 16;
 
 function formatCurrencyWhole(value) {
   return new Intl.NumberFormat("en-US", {
@@ -131,6 +133,17 @@ export default function DonationHistory() {
   const firstYear = years[0]?.year;
   const active = years.find((entry) => entry.year === activeYear);
 
+  // x runs 0-1000 and y 0-100 in the SVG's stretched coordinate space.
+  const points = years.map((entry, index) => ({
+    ...entry,
+    x: ((index + 0.5) / years.length) * 1000,
+    y: 100 - (entry.valuation / maxValuation) * (100 - PLOT_TOP),
+  }));
+  const linePath = points.map((point, index) => `${index ? "L" : "M"}${point.x},${point.y}`).join(" ");
+  const areaPath = points.length
+    ? `${linePath} L${points[points.length - 1].x},100 L${points[0].x},100 Z`
+    : "";
+
   return (
     <section className="panel donation-history" ref={sectionRef}>
       <div className="donation-hero">
@@ -165,7 +178,7 @@ export default function DonationHistory() {
         <p className="donation-chart-detail">
           {active
             ? `${active.year}: ${formatCurrencyWhole(active.valuation)} · ${formatPounds(active.pounds)} · ${active.shipments} shipment${active.shipments === 1 ? "" : "s"}`
-            : "Hover or tap a year for its poundage and shipment count."}
+            : "Hover or tap a point for that year's poundage and shipment count."}
         </p>
       </div>
 
@@ -174,33 +187,75 @@ export default function DonationHistory() {
         role="list"
         aria-label="Donated value by year"
       >
-        {years.map((entry, index) => (
-          <button
-            key={entry.year}
-            type="button"
-            role="listitem"
-            className={entry.year === activeYear ? "donation-bar-column active" : "donation-bar-column"}
-            style={{ "--bar-delay": `${index * BAR_STAGGER_MS}ms` }}
-            onMouseEnter={() => setActiveYear(entry.year)}
-            onMouseLeave={() => setActiveYear(null)}
-            onFocus={() => setActiveYear(entry.year)}
-            onBlur={() => setActiveYear(null)}
-            onClick={() => setActiveYear(entry.year)}
-            aria-label={`${entry.year}: ${formatCurrencyWhole(entry.valuation)}, ${formatPounds(entry.pounds)}, ${entry.shipments} shipments`}
+        <div className="donation-plot">
+          <svg
+            className="donation-line-svg"
+            viewBox="0 0 1000 100"
+            preserveAspectRatio="none"
+            aria-hidden="true"
           >
-            <span className="donation-bar-value">{formatCompactCurrency(entry.valuation)}</span>
-            <span className="donation-bar-track">
-              <span
-                className="donation-bar"
-                style={{ "--bar-height": `${(entry.valuation / maxValuation) * 100}%` }}
-              />
+            <defs>
+              <linearGradient id="donation-area-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#0069f3" stopOpacity="0.32" />
+                <stop offset="100%" stopColor="#0069f3" stopOpacity="0" />
+              </linearGradient>
+              <linearGradient id="donation-line-stroke" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#000e3f" />
+                <stop offset="55%" stopColor="#0035a2" />
+                <stop offset="100%" stopColor="#0069f3" />
+              </linearGradient>
+            </defs>
+            {points.length ? (
+              <>
+                <path className="donation-area" d={areaPath} fill="url(#donation-area-fill)" />
+                <path
+                  className="donation-line"
+                  d={linePath}
+                  fill="none"
+                  stroke="url(#donation-line-stroke)"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </>
+            ) : null}
+          </svg>
+
+          {points.map((point, index) => (
+            <button
+              key={point.year}
+              type="button"
+              role="listitem"
+              className={point.year === activeYear ? "donation-point active" : "donation-point"}
+              style={{
+                "--x": `${point.x / 10}%`,
+                "--y": `${point.y}%`,
+                "--point-delay": `${(index / Math.max(points.length - 1, 1)) * LINE_DRAW_MS}ms`,
+              }}
+              onMouseEnter={() => setActiveYear(point.year)}
+              onMouseLeave={() => setActiveYear(null)}
+              onFocus={() => setActiveYear(point.year)}
+              onBlur={() => setActiveYear(null)}
+              onClick={() => setActiveYear(point.year)}
+              aria-label={`${point.year}: ${formatCurrencyWhole(point.valuation)}, ${formatPounds(point.pounds)}, ${point.shipments} shipments`}
+            >
+              <span className="donation-point-value">{formatCompactCurrency(point.valuation)}</span>
+              <span className="donation-point-dot" />
+            </button>
+          ))}
+        </div>
+
+        <div className="donation-x-axis" aria-hidden="true">
+          {points.map((point) => (
+            <span
+              key={point.year}
+              className={point.year === activeYear ? "active" : ""}
+              style={{ "--x": `${point.x / 10}%` }}
+            >
+              <span className="donation-year-full">{point.year}</span>
+              <span className="donation-year-short">&rsquo;{String(point.year).slice(-2)}</span>
+              {point.year === currentYear ? <small> YTD</small> : null}
             </span>
-            <span className="donation-bar-year">
-              {entry.year}
-              {entry.year === currentYear ? <small> YTD</small> : null}
-            </span>
-          </button>
-        ))}
+          ))}
+        </div>
       </div>
 
       {history?.source === "snapshot" ? (
