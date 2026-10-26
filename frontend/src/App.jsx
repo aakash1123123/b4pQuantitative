@@ -3033,16 +3033,6 @@ export default function App() {
       ],
     },
     {
-      title: "Duration Summary",
-      ariaLabel: "Pallet duration breakdown",
-      segments: palletDurationLegendData,
-      tooltipFormatter: (segment) => [
-        segment.label,
-        `${formatNumber(segment.value)} supplies`,
-        `${segment.percentage}% of pallet supplies`,
-      ],
-    },
-    {
       title: "Category Summary",
       ariaLabel: "Pallet category breakdown",
       segments: palletCategoryLegendData,
@@ -3071,16 +3061,6 @@ export default function App() {
         `${formatNumber(segment.value)} supplies`,
         `${segment.percentage}% of pallet supplies`,
         `${formatNumber(segment.boxCount)} boxes`,
-      ],
-    },
-    {
-      title: "Supply Status",
-      ariaLabel: "Pallet supply status breakdown",
-      segments: palletSupplyStatusLegendData,
-      tooltipFormatter: (segment) => [
-        segment.label,
-        `${formatNumber(segment.value)} supplies`,
-        `${segment.percentage}% of pallet supplies`,
       ],
     },
   ];
@@ -3830,7 +3810,7 @@ export default function App() {
           </div>
 
           <div className="kpi-analytics-grid">
-            <div className="summary-card kpi-card-half">
+            <div className="summary-card kpi-card-full">
               <div className="panel-header">
                 <div>
                   <p className="section-label">Expiration Summary</p>
@@ -3854,33 +3834,6 @@ export default function App() {
                 />
               ) : (
                 <p>No expiration data is available yet.</p>
-              )}
-            </div>
-
-            <div className="summary-card kpi-card-half">
-              <div className="panel-header">
-                <div>
-                  <p className="section-label">Duration Summary</p>
-                  <h3>Inventory at a glance by warehouse duration</h3>
-                </div>
-              </div>
-
-              {durationChartLegendData.length > 0 ? (
-                <PieChartCard
-                  title="Supplies by duration bucket"
-                  ariaLabel="Pie chart of inventory by duration bucket"
-                  totalItems={totalDurationChartItems}
-                  segments={durationPieSegments}
-                  legendSegments={durationChartLegendData}
-                  background={durationPieBackground}
-                  activeLabel={activeDurationPieLabel}
-                  onHover={setActiveDurationPieLabel}
-                  onSegmentClick={(segment) =>
-                    openChartSegmentInInventory("duration", segment.label)
-                  }
-                />
-              ) : (
-                <p>No duration data is available yet.</p>
               )}
             </div>
 
@@ -3913,7 +3866,7 @@ export default function App() {
               )}
             </div>
 
-            <div className="summary-card kpi-card-third">
+            <div className="summary-card kpi-card-half">
               <div className="panel-header">
                 <div>
                   <p className="section-label">Value Summary</p>
@@ -3941,7 +3894,7 @@ export default function App() {
               )}
             </div>
 
-            <div className="summary-card kpi-card-third">
+            <div className="summary-card kpi-card-half">
               <div className="panel-header">
                 <div>
                   <p className="section-label">Box Category</p>
@@ -3972,33 +3925,6 @@ export default function App() {
               )}
             </div>
 
-            <div className="summary-card kpi-card-third">
-              <div className="panel-header">
-                <div>
-                  <p className="section-label">Supply Status</p>
-                  <h3>Inventory by workflow status</h3>
-                </div>
-              </div>
-
-              {supplyStatusLegendData.length > 0 ? (
-                <PieChartCard
-                  title="Supplies by current status"
-                  ariaLabel="Pie chart of inventory by current supply status"
-                  totalItems={totalSupplyStatusItems}
-                  segments={supplyStatusPieSegments}
-                  legendSegments={supplyStatusLegendData}
-                  background={supplyStatusPieBackground}
-                  activeLabel={activeSupplyStatusPieLabel}
-                  onHover={setActiveSupplyStatusPieLabel}
-                  cardClassName="kpi-compact-card"
-                  onSegmentClick={(segment) =>
-                    openChartSegmentInInventory("workflow", segment.label)
-                  }
-                />
-              ) : (
-                <p>No supply status data is available yet.</p>
-              )}
-            </div>
           </div>
 
           <div className="summary-card pallet-map-card">
