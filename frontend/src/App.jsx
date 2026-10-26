@@ -3967,6 +3967,7 @@ export default function App() {
                       key={summary.id}
                       className={isEditingPalletMap ? "pallet-card is-editing" : "pallet-card"}
                       style={{ left: position.x, top: position.y }}
+                      tabIndex={0}
                       onPointerDown={(event) => handlePalletPointerDown(event, summary.id)}
                     >
                       <div className="pallet-card-header">
@@ -3987,8 +3988,9 @@ export default function App() {
                         <span>{formatNumber(summary.totalSupplies)} supplies</span>
                         <span>{formatNumber(summary.totalBoxes)} boxes</span>
                       </div>
+                      {/* Box categories show on hover or focus, so the map stays readable. */}
                       <div className="pallet-card-box-list">
-                        {summary.boxBreakdown.map((entry) => (
+                        {summary.boxBreakdown.filter((entry) => entry.count > 0).map((entry) => (
                           <span key={`${summary.id}-${entry.boxType}`} className="pallet-box-pill">
                             {entry.boxType}: {formatNumber(entry.count)}
                           </span>
