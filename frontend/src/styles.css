@@ -28,9 +28,11 @@
 
   --bp-red: #df3131;
 
-  /* --- type: Jost stands in for the site's Futura, Inter for body --- */
-  --bp-display: "Jost", "Futura", "Century Gothic", sans-serif;
-  --bp-body: "Inter", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  /* --- type: brand kit is Avenir Next Arabic for headings and Aptos for
+     body. Neither is on Google Fonts, so they render where installed and
+     fall back to Jost / Inter elsewhere. --- */
+  --bp-display: "Avenir Next Arabic", "Avenir Next LT Pro", "Avenir Next", "Jost", "Futura", sans-serif;
+  --bp-body: "Aptos", "Inter", system-ui, -apple-system, "Helvetica Neue", sans-serif;
   --bp-mono: var(--bp-body);
 
   /* --- legacy aliases so existing rules keep resolving --- */
