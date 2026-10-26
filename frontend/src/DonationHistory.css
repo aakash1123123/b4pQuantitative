@@ -1,0 +1,188 @@
+/* Donation history: the lead section of the Shipment KPIs tab. */
+.donation-history {
+  margin-bottom: 18px;
+}
+
+.donation-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.donation-total {
+  margin: 6px 0 4px;
+  font-family: var(--bp-display);
+  font-size: clamp(2.6rem, 6vw, 4.4rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  width: fit-content;
+  color: var(--bp-heading, #000e3f);
+  background: var(--grad-text, none);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.donation-subtitle {
+  margin: 0;
+  color: var(--bp-ink-muted);
+}
+
+.donation-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+}
+
+.donation-stats div {
+  min-width: 140px;
+  padding: 12px 16px;
+  border: 1px solid var(--glass-border, var(--bp-line));
+  border-radius: 18px;
+  background: var(--glass-bg-inner, var(--bp-surface));
+}
+
+.donation-stats dt {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bp-ink-faint);
+}
+
+.donation-stats dd {
+  margin: 4px 0 0;
+  font-family: var(--bp-display);
+  font-size: 1.35rem;
+  font-weight: 500;
+  color: var(--bp-heading, #000e3f);
+}
+
+.donation-chart-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.donation-chart-header h3 {
+  margin: 0;
+  font-family: var(--bp-display);
+  font-weight: 500;
+  color: var(--bp-heading, #000e3f);
+}
+
+.donation-chart-detail {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--bp-ink-muted);
+}
+
+.donation-chart {
+  display: grid;
+  grid-auto-columns: minmax(44px, 1fr);
+  grid-auto-flow: column;
+  gap: 10px;
+  height: 280px;
+  margin-top: 16px;
+  padding: 18px 18px 12px;
+  border: 1px solid var(--glass-border, var(--bp-line));
+  border-radius: 18px;
+  background: var(--glass-bg-inner, var(--bp-surface));
+  overflow-x: auto;
+}
+
+.donation-bar-column {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.donation-bar-value {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--bp-heading, #000e3f);
+  opacity: 0;
+  transition: opacity 400ms ease;
+  transition-delay: calc(var(--bar-delay) + 700ms);
+}
+
+.donation-bar-track {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  border-radius: 12px;
+  background: rgba(0, 53, 162, 0.05);
+}
+
+.donation-bar {
+  width: 100%;
+  height: var(--bar-height);
+  border-radius: 12px;
+  background: var(--grad-brand, linear-gradient(180deg, #0069f3, #0035a2));
+  background-size: 100% 280px;
+  background-position: bottom;
+  box-shadow: 0 6px 16px rgba(0, 53, 162, 0.22);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 900ms cubic-bezier(0.22, 1, 0.36, 1), filter 160ms ease;
+  transition-delay: var(--bar-delay), 0ms;
+}
+
+.donation-bar-year {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--bp-ink-muted);
+}
+
+.donation-bar-year small {
+  font-size: 0.65rem;
+  color: var(--bp-accent, #373c82);
+}
+
+.donation-chart.is-visible .donation-bar {
+  transform: scaleY(1);
+}
+
+.donation-chart.is-visible .donation-bar-value {
+  opacity: 1;
+}
+
+.donation-bar-column:hover .donation-bar,
+.donation-bar-column:focus-visible .donation-bar,
+.donation-bar-column.active .donation-bar {
+  filter: brightness(1.15) saturate(1.1);
+}
+
+.donation-bar-column.active .donation-bar-year {
+  color: var(--bp-heading, #000e3f);
+}
+
+.donation-footnote {
+  margin: 12px 0 0;
+  font-size: 0.8rem;
+  color: var(--bp-ink-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .donation-bar,
+  .donation-bar-value {
+    transition: none;
+  }
+}
