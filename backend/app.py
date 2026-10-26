@@ -31,7 +31,8 @@ app.add_middleware(
 # GOOGLE SHEET CONFIG
 # ==============================
 SHEET_ID = "1OiT1QBBnlazfRCv0MgwE_LXvIVJNAVQha1Ez7M4Vc88"
-SHEET_GID = "384285232"
+# The "Final Inventorying" tab: every inventoried item, all pallets.
+SHEET_GID = "1019735220"
 SHEET_URL = (
     f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export"
     f"?format=csv&gid={SHEET_GID}"
