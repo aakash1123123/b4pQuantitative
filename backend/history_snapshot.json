@@ -1,0 +1,78 @@
+{
+  "source_sheet": "Master Shipment Database / Master Shipment List",
+  "captured": "2026-10-26",
+  "years": [
+    {
+      "year": 2015,
+      "valuation": 124379.99,
+      "pounds": 3348.84,
+      "shipments": 1
+    },
+    {
+      "year": 2016,
+      "valuation": 551189.54,
+      "pounds": 35760.0,
+      "shipments": 2
+    },
+    {
+      "year": 2017,
+      "valuation": 518978.3,
+      "pounds": 14452.38,
+      "shipments": 5
+    },
+    {
+      "year": 2018,
+      "valuation": 187400.47,
+      "pounds": 13086.97,
+      "shipments": 6
+    },
+    {
+      "year": 2019,
+      "valuation": 1216638.82,
+      "pounds": 23056.0,
+      "shipments": 5
+    },
+    {
+      "year": 2020,
+      "valuation": 752715.32,
+      "pounds": 16726.4,
+      "shipments": 4
+    },
+    {
+      "year": 2021,
+      "valuation": 794680.0,
+      "pounds": 18124.8,
+      "shipments": 4
+    },
+    {
+      "year": 2022,
+      "valuation": 1281588.0,
+      "pounds": 28689.9,
+      "shipments": 8
+    },
+    {
+      "year": 2023,
+      "valuation": 1515485.68,
+      "pounds": 35136.22,
+      "shipments": 16
+    },
+    {
+      "year": 2024,
+      "valuation": 895969.49,
+      "pounds": 24718.75,
+      "shipments": 12
+    },
+    {
+      "year": 2025,
+      "valuation": 858369.39,
+      "pounds": 32514.05,
+      "shipments": 13
+    },
+    {
+      "year": 2026,
+      "valuation": 1689924.29,
+      "pounds": 19281.66,
+      "shipments": 17
+    }
+  ]
+}
