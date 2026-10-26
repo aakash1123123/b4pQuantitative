@@ -15,13 +15,17 @@ function formatCurrencyWhole(value) {
   }).format(value ?? 0);
 }
 
-function formatCompactCurrency(value) {
+function formatCompactCurrency(value, significantDigits = null) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     notation: "compact",
-    maximumFractionDigits: 1,
+    ...(significantDigits ? { maximumSignificantDigits: significantDigits } : { maximumFractionDigits: 1 }),
   }).format(value ?? 0);
+}
+
+function formatCompactPounds(value) {
+  return `${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 0 }).format(value ?? 0)} lbs`;
 }
 
 function formatPounds(value) {
@@ -225,7 +229,9 @@ function ChapterBreakdown({ chapters, visible }) {
               >
                 <span className="chapter-swatch" style={{ background: entry.color }} />
                 <span className="chapter-name">{entry.chapter}</span>
-                <span className="chapter-value">{formatCurrencyWhole(entry.valuation)}</span>
+                <span className="chapter-value" title={formatCurrencyWhole(entry.valuation)}>
+                  {formatCompactCurrency(entry.valuation, 3)}
+                </span>
                 <span className="chapter-share">{formatPercent(entry.share)}</span>
               </button>
             </li>
@@ -269,6 +275,13 @@ export default function DonationHistory({ history, error, sideContent = null }) 
       <div className="donation-hero">
         <div>
           <p className="section-label">Donated to date</p>
+          <button
+            type="button"
+            className="secondary-button donation-report-button"
+            onClick={() => window.print()}
+          >
+            Download report
+          </button>
           <p className="donation-total" aria-live="polite">
             {history ? formatCurrencyWhole(animatedTotal) : "—"}
           </p>
@@ -280,7 +293,9 @@ export default function DonationHistory({ history, error, sideContent = null }) 
         <dl className="donation-stats">
           <div>
             <dt>Supplies shipped</dt>
-            <dd>{history ? formatPounds(history.total_pounds) : "—"}</dd>
+            <dd title={history ? formatPounds(history.total_pounds) : undefined}>
+              {history ? formatCompactPounds(history.total_pounds) : "—"}
+            </dd>
           </div>
           <div>
             <dt>Shipments</dt>
