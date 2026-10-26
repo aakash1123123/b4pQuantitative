@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import DonationHistory from "./DonationHistory";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 const SHIPMENT_STORAGE_KEY = "blueprints-current-shipments";
@@ -5224,6 +5225,8 @@ export default function App() {
       ) : null}
 
       {!loading && !error && activeTab === "shipment-kpis" ? (
+        <>
+        <DonationHistory />
         <section className="panel">
           <div className="panel-header">
             <div>
@@ -5537,6 +5540,7 @@ export default function App() {
             </div>
           ) : null}
         </section>
+        </>
       ) : null}
 
       {isShipmentModalOpen && pendingShipmentItems.length > 0 ? (

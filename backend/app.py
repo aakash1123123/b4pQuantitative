@@ -37,6 +37,16 @@ SHEET_URL = (
     f"?format=csv&gid={SHEET_GID}"
 )
 
+# Historical shipments (read-only): the "Master Shipment List" tab of the
+# Master Shipment Database. Never written to from this app.
+HISTORY_SHEET_ID = "1M4d2QYA90Ma3_Zkyh0l2oED-tqeRPDIaeUxF2Ovyao0"
+HISTORY_SHEET_GID = "0"
+HISTORY_SHEET_URL = (
+    f"https://docs.google.com/spreadsheets/d/{HISTORY_SHEET_ID}/export"
+    f"?format=csv&gid={HISTORY_SHEET_GID}"
+)
+HISTORY_SNAPSHOT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "history_snapshot.json")
+
 APPROVED_CATEGORIES = {
     "Airway & Oxygen",
     "Catheters & Briefs",
@@ -107,6 +117,21 @@ class KPIResponse(BaseModel):
     top_supplies_table: Dict[str, Dict]
     weekly_productivity_kpis: Dict[str, Dict]
     pallet_kpis: Dict[str, Dict]
+
+
+class HistoryYear(BaseModel):
+    year: int
+    valuation: float
+    pounds: float
+    shipments: int
+
+
+class HistoryResponse(BaseModel):
+    total_valuation: float
+    total_pounds: float
+    total_shipments: int
+    years: List[HistoryYear]
+    source: str
 
 
 class QuantityUpdateRequest(BaseModel):
@@ -472,3 +497,57 @@ def calculate_kpis():
 @app.post("/items/{item_id}/quantity", response_model=QuantityUpdateResponse)
 def update_item_quantity(item_id: str, payload: QuantityUpdateRequest):
     return update_sheet_quantity(item_id=item_id, quantity=payload.quantity)
+
+
+# ==============================
+# DONATION HISTORY
+# ==============================
+def summarize_history_rows(rows: List[Dict[str, Any]]) -> Dict[int, Dict[str, float]]:
+    by_year: Dict[int, Dict[str, float]] = {}
+    for row in rows:
+        # Summary rows at the bottom of the sheet have no shipment date.
+        match = re.search(r"(19|20)\d{2}", str(row.get("Date of Shipment") or ""))
+        if not match:
+            continue
+        bucket = by_year.setdefault(int(match.group()), {"valuation": 0.0, "pounds": 0.0, "shipments": 0})
+        bucket["valuation"] += parse_float(row.get("Estimated Shipment Valuation"))
+        bucket["pounds"] += parse_float(row.get("Poundage of shipments (lbs)"))
+        bucket["shipments"] += 1
+    return by_year
+
+
+def load_history_snapshot() -> Dict[int, Dict[str, float]]:
+    with open(HISTORY_SNAPSHOT_PATH, encoding="utf-8") as handle:
+        return {int(entry["year"]): entry for entry in json.load(handle)["years"]}
+
+
+@app.get("/history", response_model=HistoryResponse)
+def get_history():
+    source = "live"
+    try:
+        response = requests.get(HISTORY_SHEET_URL, timeout=15)
+        response.raise_for_status()
+        by_year = summarize_history_rows(list(csv.DictReader(StringIO(response.text))))
+        if not by_year:
+            raise ValueError("No dated shipments found in the history sheet.")
+    except Exception as exc:
+        print(f"Falling back to the history snapshot: {exc}")
+        by_year = load_history_snapshot()
+        source = "snapshot"
+
+    years = [
+        HistoryYear(
+            year=year,
+            valuation=round(values["valuation"], 2),
+            pounds=round(values["pounds"], 2),
+            shipments=int(values["shipments"]),
+        )
+        for year, values in sorted(by_year.items())
+    ]
+    return HistoryResponse(
+        total_valuation=round(sum(entry.valuation for entry in years), 2),
+        total_pounds=round(sum(entry.pounds for entry in years), 2),
+        total_shipments=sum(entry.shipments for entry in years),
+        years=years,
+        source=source,
+    )
