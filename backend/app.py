@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta
 import requests
 import csv
@@ -128,11 +128,19 @@ class HistoryYear(BaseModel):
     shipments: int
 
 
+class HistoryType(BaseModel):
+    type: str
+    valuation: float
+    pounds: float
+    shipments: int
+
+
 class HistoryResponse(BaseModel):
     total_valuation: float
     total_pounds: float
     total_shipments: int
     years: List[HistoryYear]
+    types: List[HistoryType] = []
     source: str
 
 
@@ -504,23 +512,51 @@ def update_item_quantity(item_id: str, payload: QuantityUpdateRequest):
 # ==============================
 # DONATION HISTORY
 # ==============================
-def summarize_history_rows(rows: List[Dict[str, Any]]) -> Dict[int, Dict[str, float]]:
+HISTORY_SHIPMENT_TYPES = ("Local", "International")
+
+
+def normalize_history_shipment_type(value: Any) -> Optional[str]:
+    """Map the sheet's Shipment Type onto the dashboard's two types.
+
+    National shipments count as International, as they do for shipments
+    created in the app.
+    """
+    text = str(value or "").strip().lower()
+    if text == "local":
+        return "Local"
+    if text in ("international", "national"):
+        return "International"
+    return None
+
+
+def summarize_history_rows(rows: List[Dict[str, Any]]) -> Tuple[Dict[int, Dict[str, float]], Dict[str, Dict[str, float]]]:
+    """Totals per year and per shipment type."""
     by_year: Dict[int, Dict[str, float]] = {}
+    by_type: Dict[str, Dict[str, float]] = {}
     for row in rows:
         # Summary rows at the bottom of the sheet have no shipment date.
         match = re.search(r"(19|20)\d{2}", str(row.get("Date of Shipment") or ""))
         if not match:
             continue
-        bucket = by_year.setdefault(int(match.group()), {"valuation": 0.0, "pounds": 0.0, "shipments": 0})
-        bucket["valuation"] += parse_float(row.get("Estimated Shipment Valuation"))
-        bucket["pounds"] += parse_float(row.get("Poundage of shipments (lbs)"))
-        bucket["shipments"] += 1
-    return by_year
+        valuation = parse_float(row.get("Estimated Shipment Valuation"))
+        pounds = parse_float(row.get("Poundage of shipments (lbs)"))
+        buckets = [by_year.setdefault(int(match.group()), {"valuation": 0.0, "pounds": 0.0, "shipments": 0})]
+        shipment_type = normalize_history_shipment_type(row.get("Shipment Type"))
+        if shipment_type:
+            buckets.append(by_type.setdefault(shipment_type, {"valuation": 0.0, "pounds": 0.0, "shipments": 0}))
+        for bucket in buckets:
+            bucket["valuation"] += valuation
+            bucket["pounds"] += pounds
+            bucket["shipments"] += 1
+    return by_year, by_type
 
 
-def load_history_snapshot() -> Dict[int, Dict[str, float]]:
+def load_history_snapshot() -> Tuple[Dict[int, Dict[str, float]], Dict[str, Dict[str, float]]]:
     with open(HISTORY_SNAPSHOT_PATH, encoding="utf-8") as handle:
-        return {int(entry["year"]): entry for entry in json.load(handle)["years"]}
+        snapshot = json.load(handle)
+    by_year = {int(entry["year"]): entry for entry in snapshot["years"]}
+    by_type = {entry["type"]: entry for entry in snapshot.get("types", [])}
+    return by_year, by_type
 
 
 @app.get("/history", response_model=HistoryResponse)
@@ -529,12 +565,12 @@ def get_history():
     try:
         response = requests.get(HISTORY_SHEET_URL, timeout=15)
         response.raise_for_status()
-        by_year = summarize_history_rows(list(csv.DictReader(StringIO(response.text))))
+        by_year, by_type = summarize_history_rows(list(csv.DictReader(StringIO(response.text))))
         if not by_year:
             raise ValueError("No dated shipments found in the history sheet.")
     except Exception as exc:
         print(f"Falling back to the history snapshot: {exc}")
-        by_year = load_history_snapshot()
+        by_year, by_type = load_history_snapshot()
         source = "snapshot"
 
     years = [
@@ -546,10 +582,21 @@ def get_history():
         )
         for year, values in sorted(by_year.items())
     ]
+    types = [
+        HistoryType(
+            type=shipment_type,
+            valuation=round(by_type[shipment_type]["valuation"], 2),
+            pounds=round(by_type[shipment_type]["pounds"], 2),
+            shipments=int(by_type[shipment_type]["shipments"]),
+        )
+        for shipment_type in HISTORY_SHIPMENT_TYPES
+        if shipment_type in by_type
+    ]
     return HistoryResponse(
         total_valuation=round(sum(entry.valuation for entry in years), 2),
         total_pounds=round(sum(entry.pounds for entry in years), 2),
         total_shipments=sum(entry.shipments for entry in years),
         years=years,
+        types=types,
         source=source,
     )
