@@ -176,9 +176,9 @@ function applyDashboardTooltips(root = document) {
 }
 
 const tabs = [
+  { id: "shipment-kpis", label: "Shipment KPIs" },
   { id: "kpis", label: "Inventory KPIs" },
   { id: "shipments", label: "Shipments" },
-  { id: "shipment-kpis", label: "Shipment KPIs" },
   { id: "inventory", label: "Total Inventory" },
 ];
 
@@ -1542,7 +1542,7 @@ function ShipmentItemsLineChart({ points, xAxisEndLabel, onSelectShipment }) {
 
 export default function App() {
   const currentCalendarYear = new Date().getFullYear();
-  const [activeTab, setActiveTab] = useState("inventory");
+  const [activeTab, setActiveTab] = useState(tabs[0].id);
   const [activeShipmentSubtab, setActiveShipmentSubtab] = useState("current");
   const [activeShipmentKpiSubtab, setActiveShipmentKpiSubtab] = useState("overview");
   const [items, setItems] = useState([]);
