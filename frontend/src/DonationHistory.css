@@ -86,92 +86,200 @@
 }
 
 .donation-chart {
-  display: grid;
-  grid-auto-columns: minmax(44px, 1fr);
-  grid-auto-flow: column;
-  gap: 10px;
-  height: 280px;
   margin-top: 16px;
-  padding: 18px 18px 12px;
+  padding: 22px 18px 12px;
   border: 1px solid var(--glass-border, var(--bp-line));
   border-radius: 18px;
   background: var(--glass-bg-inner, var(--bp-surface));
-  overflow-x: auto;
 }
 
-.donation-bar-column {
+.donation-plot {
+  position: relative;
+  height: 260px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 53, 162, 0.07) 0 1px,
+    transparent 1px 25%
+  );
+}
+
+.donation-line-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* The line is revealed left to right in step with the points; the fill
+   fades in under it. */
+.donation-line-svg {
+  clip-path: inset(-20px 100% -20px -20px);
+}
+
+.donation-line {
+  stroke-width: 3.5px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 6px 10px rgba(0, 53, 162, 0.25));
+}
+
+.donation-area {
+  opacity: 0;
+}
+
+.donation-chart.is-visible .donation-line-svg {
+  animation: donation-line-draw 2600ms linear forwards;
+}
+
+.donation-chart.is-visible .donation-area {
+  animation: donation-fade-in 1400ms ease 1200ms forwards;
+}
+
+.donation-point {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 6px;
-  min-width: 0;
+  justify-items: center;
+  width: 64px;
+  margin: 0;
   padding: 0;
   border: 0;
   background: none;
   font: inherit;
   cursor: pointer;
+  transform: translate(-50%, calc(-100% + 7px));
 }
 
-.donation-bar-value {
-  font-size: 0.72rem;
+.donation-point-value {
+  margin-bottom: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
   font-weight: 600;
-  text-align: center;
   white-space: nowrap;
   color: var(--bp-heading, #000e3f);
+  background: rgba(255, 255, 255, 0.75);
   opacity: 0;
-  transition: opacity 400ms ease;
-  transition-delay: calc(var(--bar-delay) + 700ms);
+  transition: background 160ms ease, color 160ms ease;
 }
 
-.donation-bar-track {
+.donation-point-dot {
+  width: 14px;
+  height: 14px;
+  border: 3px solid #ffffff;
+  border-radius: 999px;
+  background: var(--grad-brand, #0035a2);
+  box-shadow: 0 2px 8px rgba(0, 53, 162, 0.35);
+  scale: 0;
+  transition: transform 200ms ease;
+}
+
+/* Points and labels pop in as the line reaches them. Animations (not
+   transitions) so they also play when the data arrives after the chart is
+   already on screen; they use the individual scale/translate properties so
+   the hover transform still applies. */
+.donation-chart.is-visible .donation-point-dot {
+  animation: donation-point-pop 350ms cubic-bezier(0.34, 1.56, 0.64, 1) var(--point-delay) both;
+}
+
+.donation-chart.is-visible .donation-point-value {
+  animation: donation-label-in 400ms ease calc(var(--point-delay) + 150ms) both;
+}
+
+.donation-point:hover .donation-point-dot,
+.donation-point:focus-visible .donation-point-dot,
+.donation-point.active .donation-point-dot {
+  transform: scale(1.35);
+}
+
+.donation-point:hover .donation-point-value,
+.donation-point:focus-visible .donation-point-value,
+.donation-point.active .donation-point-value {
+  color: #ffffff;
+  background: var(--bp-heading, #000e3f);
+}
+
+.donation-x-axis {
   position: relative;
-  display: flex;
-  align-items: flex-end;
-  border-radius: 12px;
-  background: rgba(0, 53, 162, 0.05);
+  height: 24px;
+  margin-top: 10px;
 }
 
-.donation-bar {
-  width: 100%;
-  height: var(--bar-height);
-  border-radius: 12px;
-  background: var(--grad-brand, linear-gradient(180deg, #0069f3, #0035a2));
-  background-size: 100% 280px;
-  background-position: bottom;
-  box-shadow: 0 6px 16px rgba(0, 53, 162, 0.22);
-  transform: scaleY(0);
-  transform-origin: bottom;
-  transition: transform 900ms cubic-bezier(0.22, 1, 0.36, 1), filter 160ms ease;
-  transition-delay: var(--bar-delay), 0ms;
-}
-
-.donation-bar-year {
+.donation-x-axis > span {
+  position: absolute;
+  left: var(--x);
+  transform: translateX(-50%);
   font-size: 0.78rem;
   font-weight: 600;
-  text-align: center;
+  white-space: nowrap;
   color: var(--bp-ink-muted);
 }
 
-.donation-bar-year small {
-  font-size: 0.65rem;
+.donation-x-axis > span.active {
+  color: var(--bp-heading, #000e3f);
+}
+
+.donation-x-axis small {
+  font-size: 0.62rem;
   color: var(--bp-accent, #373c82);
 }
 
-.donation-chart.is-visible .donation-bar {
-  transform: scaleY(1);
+.donation-year-short {
+  display: none;
 }
 
-.donation-chart.is-visible .donation-bar-value {
-  opacity: 1;
+@keyframes donation-line-draw {
+  to {
+    clip-path: inset(-20px -20px -20px -20px);
+  }
 }
 
-.donation-bar-column:hover .donation-bar,
-.donation-bar-column:focus-visible .donation-bar,
-.donation-bar-column.active .donation-bar {
-  filter: brightness(1.15) saturate(1.1);
+@keyframes donation-point-pop {
+  from {
+    scale: 0;
+  }
+  to {
+    scale: 1;
+  }
 }
 
-.donation-bar-column.active .donation-bar-year {
-  color: var(--bp-heading, #000e3f);
+@keyframes donation-label-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes donation-fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+/* On narrow screens, show values on hover or tap only so labels don't collide. */
+@media (max-width: 720px) {
+  .donation-point {
+    width: 36px;
+  }
+
+  .donation-point-value {
+    display: none;
+  }
+
+  .donation-x-axis small,
+  .donation-year-full {
+    display: none;
+  }
+
+  .donation-year-short {
+    display: inline;
+  }
 }
 
 .donation-footnote {
@@ -181,8 +289,17 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .donation-bar,
-  .donation-bar-value {
-    transition: none;
+  .donation-chart .donation-line-svg,
+  .donation-chart .donation-area {
+    animation: none;
+    clip-path: none;
+    opacity: 1;
+  }
+
+  .donation-chart .donation-point-dot,
+  .donation-chart .donation-point-value {
+    animation: none;
+    scale: 1;
+    opacity: 1;
   }
 }
