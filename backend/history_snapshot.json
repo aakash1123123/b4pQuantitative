@@ -88,5 +88,42 @@
       "pounds": 260678.61,
       "shipments": 68
     }
+  ],
+  "chapters": [
+    {
+      "chapter": "UMich",
+      "valuation": 9012642.95,
+      "shipments": 81
+    },
+    {
+      "chapter": "GHA",
+      "valuation": 557221.2,
+      "shipments": 3
+    },
+    {
+      "chapter": "WSU",
+      "valuation": 549476.31,
+      "shipments": 3
+    },
+    {
+      "chapter": "MSU",
+      "valuation": 92187.52,
+      "shipments": 1
+    },
+    {
+      "chapter": "UT-San",
+      "valuation": 79645.0,
+      "shipments": 2
+    },
+    {
+      "chapter": "Marquette",
+      "valuation": 74655.18,
+      "shipments": 3
+    },
+    {
+      "chapter": "USC",
+      "valuation": 21491.13,
+      "shipments": 2
+    }
   ]
 }

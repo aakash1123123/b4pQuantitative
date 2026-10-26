@@ -28,6 +28,18 @@ function formatPounds(value) {
   return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value ?? 0)} lbs`;
 }
 
+// Categorical slots in fixed order (brand blue first); validated for
+// colorblind separation. Chapters keep their slot by rank in the totals.
+const CHAPTER_COLORS = ["#0069f3", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6"];
+const DONUT_RADIUS = 70;
+const DONUT_CIRCUMFERENCE = 2 * Math.PI * DONUT_RADIUS;
+// Surface-colored gap between slices, in SVG units along the ring.
+const DONUT_GAP = 2;
+
+function formatPercent(value) {
+  return `${value < 1 ? value.toFixed(1) : Math.round(value)}%`;
+}
+
 function prefersReducedMotion() {
   return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }
@@ -121,6 +133,107 @@ export function useDonationHistory() {
   }, []);
 
   return { history, error };
+}
+
+function ChapterBreakdown({ chapters, visible }) {
+  const [activeChapter, setActiveChapter] = useState(null);
+  const total = chapters.reduce((sum, entry) => sum + entry.valuation, 0) || 1;
+
+  // Chapters past the palette fold into "Other" rather than reusing a color.
+  const slices = chapters.slice(0, CHAPTER_COLORS.length - 1);
+  const rest = chapters.slice(CHAPTER_COLORS.length - 1);
+  if (rest.length === 1) {
+    slices.push(rest[0]);
+  } else if (rest.length > 1) {
+    slices.push({
+      chapter: "Other",
+      valuation: rest.reduce((sum, entry) => sum + entry.valuation, 0),
+      shipments: rest.reduce((sum, entry) => sum + entry.shipments, 0),
+    });
+  }
+
+  let offset = 0;
+  const arcs = slices.map((entry, index) => {
+    const share = entry.valuation / total;
+    const length = share * DONUT_CIRCUMFERENCE;
+    const arc = {
+      ...entry,
+      share: share * 100,
+      color: CHAPTER_COLORS[index],
+      length: Math.max(length - DONUT_GAP, 0.5),
+      offset,
+      delay: offset / DONUT_CIRCUMFERENCE,
+    };
+    offset += length;
+    return arc;
+  });
+  const active = arcs.find((entry) => entry.chapter === activeChapter);
+
+  return (
+    <div className="chapter-breakdown">
+      <div className="donation-chart-header">
+        <h3>Donated value by chapter</h3>
+        <p className="donation-chart-detail">
+          {active
+            ? `${active.chapter}: ${formatCurrencyWhole(active.valuation)} · ${formatPercent(active.share)} · ${active.shipments} shipment${active.shipments === 1 ? "" : "s"}`
+            : "Hover or tap a chapter for its share."}
+        </p>
+      </div>
+
+      <div className={visible ? "chapter-breakdown-body is-visible" : "chapter-breakdown-body"}>
+        <div className="chapter-donut">
+          <svg viewBox="0 0 200 200" role="img" aria-label="Donated value by chapter">
+            <g transform="rotate(-90 100 100)">
+              {arcs.map((entry) => (
+                <circle
+                  key={entry.chapter}
+                  className={entry.chapter === activeChapter ? "chapter-slice active" : "chapter-slice"}
+                  cx="100"
+                  cy="100"
+                  r={DONUT_RADIUS}
+                  fill="none"
+                  stroke={entry.color}
+                  style={{
+                    "--slice-length": entry.length,
+                    "--slice-delay": `${entry.delay * 1400}ms`,
+                    strokeDasharray: `${entry.length} ${DONUT_CIRCUMFERENCE}`,
+                    strokeDashoffset: -entry.offset,
+                  }}
+                  onMouseEnter={() => setActiveChapter(entry.chapter)}
+                  onMouseLeave={() => setActiveChapter(null)}
+                  onClick={() => setActiveChapter(entry.chapter)}
+                />
+              ))}
+            </g>
+          </svg>
+          <div className="chapter-donut-center" aria-hidden="true">
+            <strong>{active ? formatPercent(active.share) : arcs.length}</strong>
+            <span>{active ? active.chapter : "chapters"}</span>
+          </div>
+        </div>
+
+        <ul className="chapter-legend">
+          {arcs.map((entry) => (
+            <li key={entry.chapter}>
+              <button
+                type="button"
+                className={entry.chapter === activeChapter ? "active" : ""}
+                onMouseEnter={() => setActiveChapter(entry.chapter)}
+                onMouseLeave={() => setActiveChapter(null)}
+                onFocus={() => setActiveChapter(entry.chapter)}
+                onBlur={() => setActiveChapter(null)}
+              >
+                <span className="chapter-swatch" style={{ background: entry.color }} />
+                <span className="chapter-name">{entry.chapter}</span>
+                <span className="chapter-value">{formatCurrencyWhole(entry.valuation)}</span>
+                <span className="chapter-share">{formatPercent(entry.share)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
 }
 
 export default function DonationHistory({ history, error }) {
@@ -264,6 +377,10 @@ export default function DonationHistory({ history, error }) {
           ))}
         </div>
       </div>
+
+      {history?.chapters?.length ? (
+        <ChapterBreakdown chapters={history.chapters} visible={seen && Boolean(history)} />
+      ) : null}
 
       {history?.source === "snapshot" ? (
         <p className="donation-footnote">
