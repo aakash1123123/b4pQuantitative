@@ -1,0 +1,156 @@
+/* Read-only archive of Master Shipment Database rows on the Past Shipments tab. */
+.past-archive {
+  margin-top: 28px;
+}
+
+.past-archive-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.past-archive-header h3 {
+  margin: 0;
+  font-family: var(--bp-display);
+  font-weight: 500;
+  color: var(--bp-heading, #000e3f);
+}
+
+.past-archive-empty {
+  color: var(--bp-ink-muted);
+}
+
+.past-archive-list {
+  display: grid;
+  gap: 8px;
+}
+
+.past-archive-card {
+  border: 1px solid var(--glass-border, var(--bp-line));
+  border-radius: 16px;
+  background: var(--glass-bg-inner, var(--bp-surface));
+  overflow: hidden;
+}
+
+.past-archive-summary {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) 110px 120px 100px 20px;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--bp-ink-muted);
+  cursor: pointer;
+}
+
+.past-archive-summary:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.past-archive-date {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.past-archive-title {
+  display: grid;
+  min-width: 0;
+}
+
+.past-archive-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--bp-heading, #000e3f);
+}
+
+.past-archive-title span {
+  font-size: 0.82rem;
+}
+
+.past-archive-type {
+  justify-self: start;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(0, 53, 162, 0.08);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--bp-blue, #0035a2);
+}
+
+.past-archive-figure {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  font-weight: 600;
+  color: var(--bp-heading, #000e3f);
+}
+
+.past-archive-figure-muted {
+  font-weight: 500;
+  color: var(--bp-ink-muted);
+}
+
+.past-archive-chevron {
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.past-archive-details {
+  display: grid;
+  gap: 10px;
+  padding: 4px 16px 16px;
+}
+
+.past-archive-details dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.past-archive-details dt {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bp-ink-faint);
+}
+
+.past-archive-details dd {
+  margin: 2px 0 0;
+  color: var(--bp-heading, #000e3f);
+}
+
+.past-archive-comments {
+  margin: 0;
+  color: var(--bp-ink-muted);
+}
+
+.past-archive-details a {
+  justify-self: start;
+  font-weight: 600;
+  color: var(--bp-blue-bright, #0069f3);
+}
+
+@media (max-width: 720px) {
+  .past-archive-summary {
+    grid-template-columns: minmax(0, 1fr) auto 20px;
+    gap: 4px 12px;
+  }
+
+  .past-archive-date {
+    grid-column: 1 / -1;
+  }
+
+  .past-archive-type,
+  .past-archive-figure-muted {
+    display: none;
+  }
+}
