@@ -74,5 +74,19 @@
       "pounds": 19281.66,
       "shipments": 17
     }
+  ],
+  "types": [
+    {
+      "type": "Local",
+      "valuation": 169101.76,
+      "pounds": 4217.36,
+      "shipments": 25
+    },
+    {
+      "type": "International",
+      "valuation": 10218217.53,
+      "pounds": 260678.61,
+      "shipments": 68
+    }
   ]
 }

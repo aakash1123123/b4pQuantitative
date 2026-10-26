@@ -90,12 +90,11 @@ function useCountUp(target, start) {
   return value;
 }
 
-export default function DonationHistory() {
+// Loads the Master Shipment Database summary once. Shared by the donation
+// section and the local/international stats on Shipment KPIs.
+export function useDonationHistory() {
   const [history, setHistory] = useState(null);
   const [error, setError] = useState("");
-  const [activeYear, setActiveYear] = useState(null);
-  const sectionRef = useRef(null);
-  const seen = useSeenOnce(sectionRef);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,6 +119,14 @@ export default function DonationHistory() {
       cancelled = true;
     };
   }, []);
+
+  return { history, error };
+}
+
+export default function DonationHistory({ history, error }) {
+  const [activeYear, setActiveYear] = useState(null);
+  const sectionRef = useRef(null);
+  const seen = useSeenOnce(sectionRef);
 
   const animatedTotal = useCountUp(history?.total_valuation ?? 0, seen && Boolean(history));
 
