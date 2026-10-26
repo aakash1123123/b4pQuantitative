@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import DonationHistory, { useDonationHistory } from "./DonationHistory";
+import PastShipmentArchive from "./PastShipmentArchive";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 const SHIPMENT_STORAGE_KEY = "blueprints-current-shipments";
@@ -4932,6 +4933,10 @@ export default function App() {
                   })}
                 </div>
               )}
+              <PastShipmentArchive
+                searchTerm={pastShipmentSearchTerm}
+                typeFilter={pastShipmentTypeFilter}
+              />
             </div>
           ) : null}
         </section>
