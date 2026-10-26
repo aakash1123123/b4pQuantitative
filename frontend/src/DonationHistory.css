@@ -303,3 +303,45 @@
     opacity: 1;
   }
 }
+
+/* Local / international totals under the Shipment Mix chart on Shipment KPIs. */
+.shipment-type-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin: 14px 0 0;
+}
+
+.shipment-type-stats > div {
+  padding: 12px 16px;
+  border: 1px solid var(--glass-border, var(--bp-line));
+  border-radius: 18px;
+  background: var(--glass-bg-inner, var(--bp-surface));
+}
+
+.shipment-type-stats dt {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bp-ink-faint);
+}
+
+.shipment-type-stats dd {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: var(--bp-ink-muted);
+}
+
+.shipment-type-stats dd strong {
+  font-family: var(--bp-display);
+  font-size: 1.35rem;
+  font-weight: 500;
+  color: var(--bp-heading, #000e3f);
+}
+
+.shipment-type-note {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: var(--bp-ink-faint);
+}
