@@ -176,10 +176,10 @@ function applyDashboardTooltips(root = document) {
 }
 
 const tabs = [
-  { id: "inventory", label: "Total Inventory" },
   { id: "kpis", label: "Inventory KPIs" },
   { id: "shipments", label: "Shipments" },
   { id: "shipment-kpis", label: "Shipment KPIs" },
+  { id: "inventory", label: "Total Inventory" },
 ];
 
 const defaultShipments = [
