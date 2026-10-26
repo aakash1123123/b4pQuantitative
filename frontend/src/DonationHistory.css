@@ -1,0 +1,305 @@
+/* Donation history: the lead section of the Shipment KPIs tab. */
+.donation-history {
+  margin-bottom: 18px;
+}
+
+.donation-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.donation-total {
+  margin: 6px 0 4px;
+  font-family: var(--bp-display);
+  font-size: clamp(2.6rem, 6vw, 4.4rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  width: fit-content;
+  color: var(--bp-heading, #000e3f);
+  background: var(--grad-text, none);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.donation-subtitle {
+  margin: 0;
+  color: var(--bp-ink-muted);
+}
+
+.donation-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+}
+
+.donation-stats div {
+  min-width: 140px;
+  padding: 12px 16px;
+  border: 1px solid var(--glass-border, var(--bp-line));
+  border-radius: 18px;
+  background: var(--glass-bg-inner, var(--bp-surface));
+}
+
+.donation-stats dt {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bp-ink-faint);
+}
+
+.donation-stats dd {
+  margin: 4px 0 0;
+  font-family: var(--bp-display);
+  font-size: 1.35rem;
+  font-weight: 500;
+  color: var(--bp-heading, #000e3f);
+}
+
+.donation-chart-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.donation-chart-header h3 {
+  margin: 0;
+  font-family: var(--bp-display);
+  font-weight: 500;
+  color: var(--bp-heading, #000e3f);
+}
+
+.donation-chart-detail {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--bp-ink-muted);
+}
+
+.donation-chart {
+  margin-top: 16px;
+  padding: 22px 18px 12px;
+  border: 1px solid var(--glass-border, var(--bp-line));
+  border-radius: 18px;
+  background: var(--glass-bg-inner, var(--bp-surface));
+}
+
+.donation-plot {
+  position: relative;
+  height: 260px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 53, 162, 0.07) 0 1px,
+    transparent 1px 25%
+  );
+}
+
+.donation-line-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* The line is revealed left to right in step with the points; the fill
+   fades in under it. */
+.donation-line-svg {
+  clip-path: inset(-20px 100% -20px -20px);
+}
+
+.donation-line {
+  stroke-width: 3.5px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 6px 10px rgba(0, 53, 162, 0.25));
+}
+
+.donation-area {
+  opacity: 0;
+}
+
+.donation-chart.is-visible .donation-line-svg {
+  animation: donation-line-draw 2600ms linear forwards;
+}
+
+.donation-chart.is-visible .donation-area {
+  animation: donation-fade-in 1400ms ease 1200ms forwards;
+}
+
+.donation-point {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  display: grid;
+  justify-items: center;
+  width: 64px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  transform: translate(-50%, calc(-100% + 7px));
+}
+
+.donation-point-value {
+  margin-bottom: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--bp-heading, #000e3f);
+  background: rgba(255, 255, 255, 0.75);
+  opacity: 0;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.donation-point-dot {
+  width: 14px;
+  height: 14px;
+  border: 3px solid #ffffff;
+  border-radius: 999px;
+  background: var(--grad-brand, #0035a2);
+  box-shadow: 0 2px 8px rgba(0, 53, 162, 0.35);
+  scale: 0;
+  transition: transform 200ms ease;
+}
+
+/* Points and labels pop in as the line reaches them. Animations (not
+   transitions) so they also play when the data arrives after the chart is
+   already on screen; they use the individual scale/translate properties so
+   the hover transform still applies. */
+.donation-chart.is-visible .donation-point-dot {
+  animation: donation-point-pop 350ms cubic-bezier(0.34, 1.56, 0.64, 1) var(--point-delay) both;
+}
+
+.donation-chart.is-visible .donation-point-value {
+  animation: donation-label-in 400ms ease calc(var(--point-delay) + 150ms) both;
+}
+
+.donation-point:hover .donation-point-dot,
+.donation-point:focus-visible .donation-point-dot,
+.donation-point.active .donation-point-dot {
+  transform: scale(1.35);
+}
+
+.donation-point:hover .donation-point-value,
+.donation-point:focus-visible .donation-point-value,
+.donation-point.active .donation-point-value {
+  color: #ffffff;
+  background: var(--bp-heading, #000e3f);
+}
+
+.donation-x-axis {
+  position: relative;
+  height: 24px;
+  margin-top: 10px;
+}
+
+.donation-x-axis > span {
+  position: absolute;
+  left: var(--x);
+  transform: translateX(-50%);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--bp-ink-muted);
+}
+
+.donation-x-axis > span.active {
+  color: var(--bp-heading, #000e3f);
+}
+
+.donation-x-axis small {
+  font-size: 0.62rem;
+  color: var(--bp-accent, #373c82);
+}
+
+.donation-year-short {
+  display: none;
+}
+
+@keyframes donation-line-draw {
+  to {
+    clip-path: inset(-20px -20px -20px -20px);
+  }
+}
+
+@keyframes donation-point-pop {
+  from {
+    scale: 0;
+  }
+  to {
+    scale: 1;
+  }
+}
+
+@keyframes donation-label-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes donation-fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+/* On narrow screens, show values on hover or tap only so labels don't collide. */
+@media (max-width: 720px) {
+  .donation-point {
+    width: 36px;
+  }
+
+  .donation-point-value {
+    display: none;
+  }
+
+  .donation-x-axis small,
+  .donation-year-full {
+    display: none;
+  }
+
+  .donation-year-short {
+    display: inline;
+  }
+}
+
+.donation-footnote {
+  margin: 12px 0 0;
+  font-size: 0.8rem;
+  color: var(--bp-ink-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .donation-chart .donation-line-svg,
+  .donation-chart .donation-area {
+    animation: none;
+    clip-path: none;
+    opacity: 1;
+  }
+
+  .donation-chart .donation-point-dot,
+  .donation-chart .donation-point-value {
+    animation: none;
+    scale: 1;
+    opacity: 1;
+  }
+}
