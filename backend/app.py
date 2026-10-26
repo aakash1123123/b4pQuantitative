@@ -48,6 +48,10 @@ HISTORY_SHEET_URL = (
     f"?format=csv&gid={HISTORY_SHEET_GID}"
 )
 HISTORY_SNAPSHOT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "history_snapshot.json")
+# A saved copy of the Master Shipment List rows, used when the live sheet can't be read.
+HISTORY_SHIPMENTS_SNAPSHOT_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "history_shipments_snapshot.csv"
+)
 
 APPROVED_CATEGORIES = {
     "Airway & Oxygen",
@@ -744,6 +748,11 @@ def get_past_shipments():
     try:
         response = requests.get(HISTORY_SHEET_URL, timeout=15)
         response.raise_for_status()
-    except requests.RequestException as exc:
-        raise HTTPException(status_code=502, detail=f"Unable to load the Master Shipment Database: {exc}") from exc
-    return build_past_shipments(list(csv.DictReader(StringIO(response.text))))
+        shipments = build_past_shipments(list(csv.DictReader(StringIO(response.text))))
+        if not shipments:
+            raise ValueError("No dated shipments found in the history sheet.")
+        return shipments
+    except Exception as exc:
+        print(f"Falling back to the past shipments snapshot: {exc}")
+    with open(HISTORY_SHIPMENTS_SNAPSHOT_PATH, encoding="utf-8", newline="") as handle:
+        return build_past_shipments(list(csv.DictReader(handle)))
