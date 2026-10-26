@@ -236,7 +236,7 @@ function ChapterBreakdown({ chapters, visible }) {
   );
 }
 
-export default function DonationHistory({ history, error }) {
+export default function DonationHistory({ history, error, sideContent = null }) {
   const [activeYear, setActiveYear] = useState(null);
   const sectionRef = useRef(null);
   const seen = useSeenOnce(sectionRef);
@@ -378,9 +378,12 @@ export default function DonationHistory({ history, error }) {
         </div>
       </div>
 
-      {history?.chapters?.length ? (
-        <ChapterBreakdown chapters={history.chapters} visible={seen && Boolean(history)} />
-      ) : null}
+      <div className="donation-split">
+        {history?.chapters?.length ? (
+          <ChapterBreakdown chapters={history.chapters} visible={seen && Boolean(history)} />
+        ) : null}
+        {sideContent}
+      </div>
 
       {history?.source === "snapshot" ? (
         <p className="donation-footnote">
