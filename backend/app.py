@@ -135,12 +135,19 @@ class HistoryType(BaseModel):
     shipments: int
 
 
+class HistoryChapter(BaseModel):
+    chapter: str
+    valuation: float
+    shipments: int
+
+
 class HistoryResponse(BaseModel):
     total_valuation: float
     total_pounds: float
     total_shipments: int
     years: List[HistoryYear]
     types: List[HistoryType] = []
+    chapters: List[HistoryChapter] = []
     source: str
 
 
@@ -529,10 +536,19 @@ def normalize_history_shipment_type(value: Any) -> Optional[str]:
     return None
 
 
-def summarize_history_rows(rows: List[Dict[str, Any]]) -> Tuple[Dict[int, Dict[str, float]], Dict[str, Dict[str, float]]]:
-    """Totals per year and per shipment type."""
+HistorySummary = Tuple[Dict[int, Dict[str, float]], Dict[str, Dict[str, float]], Dict[str, Dict[str, float]]]
+
+
+def summarize_history_rows(rows: List[Dict[str, Any]]) -> HistorySummary:
+    """Totals per year, per shipment type and per chapter.
+
+    A shipment listed under several chapters ("UMich, WSU") splits its value
+    evenly between them. Chapter names are matched ignoring case and spacing,
+    and keep the first spelling seen.
+    """
     by_year: Dict[int, Dict[str, float]] = {}
     by_type: Dict[str, Dict[str, float]] = {}
+    by_chapter: Dict[str, Dict[str, Any]] = {}
     for row in rows:
         # Summary rows at the bottom of the sheet have no shipment date.
         match = re.search(r"(19|20)\d{2}", str(row.get("Date of Shipment") or ""))
@@ -548,15 +564,21 @@ def summarize_history_rows(rows: List[Dict[str, Any]]) -> Tuple[Dict[int, Dict[s
             bucket["valuation"] += valuation
             bucket["pounds"] += pounds
             bucket["shipments"] += 1
-    return by_year, by_type
+        chapters = [name.strip() for name in str(row.get("Chapters") or "").split(",") if name.strip()]
+        for name in chapters:
+            bucket = by_chapter.setdefault(name.lower(), {"chapter": name, "valuation": 0.0, "shipments": 0})
+            bucket["valuation"] += valuation / len(chapters)
+            bucket["shipments"] += 1
+    return by_year, by_type, by_chapter
 
 
-def load_history_snapshot() -> Tuple[Dict[int, Dict[str, float]], Dict[str, Dict[str, float]]]:
+def load_history_snapshot() -> HistorySummary:
     with open(HISTORY_SNAPSHOT_PATH, encoding="utf-8") as handle:
         snapshot = json.load(handle)
     by_year = {int(entry["year"]): entry for entry in snapshot["years"]}
     by_type = {entry["type"]: entry for entry in snapshot.get("types", [])}
-    return by_year, by_type
+    by_chapter = {entry["chapter"].lower(): entry for entry in snapshot.get("chapters", [])}
+    return by_year, by_type, by_chapter
 
 
 @app.get("/history", response_model=HistoryResponse)
@@ -565,12 +587,12 @@ def get_history():
     try:
         response = requests.get(HISTORY_SHEET_URL, timeout=15)
         response.raise_for_status()
-        by_year, by_type = summarize_history_rows(list(csv.DictReader(StringIO(response.text))))
+        by_year, by_type, by_chapter = summarize_history_rows(list(csv.DictReader(StringIO(response.text))))
         if not by_year:
             raise ValueError("No dated shipments found in the history sheet.")
     except Exception as exc:
         print(f"Falling back to the history snapshot: {exc}")
-        by_year, by_type = load_history_snapshot()
+        by_year, by_type, by_chapter = load_history_snapshot()
         source = "snapshot"
 
     years = [
@@ -592,11 +614,24 @@ def get_history():
         for shipment_type in HISTORY_SHIPMENT_TYPES
         if shipment_type in by_type
     ]
+    chapters = sorted(
+        (
+            HistoryChapter(
+                chapter=values["chapter"],
+                valuation=round(values["valuation"], 2),
+                shipments=int(values["shipments"]),
+            )
+            for values in by_chapter.values()
+        ),
+        key=lambda entry: entry.valuation,
+        reverse=True,
+    )
     return HistoryResponse(
         total_valuation=round(sum(entry.valuation for entry in years), 2),
         total_pounds=round(sum(entry.pounds for entry in years), 2),
         total_shipments=sum(entry.shipments for entry in years),
         years=years,
         types=types,
+        chapters=chapters,
         source=source,
     )

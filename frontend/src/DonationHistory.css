@@ -345,3 +345,150 @@
   font-size: 0.8rem;
   color: var(--bp-ink-faint);
 }
+
+/* Donated value by chapter: donut + legend inside the donation section. */
+.chapter-breakdown-body {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  align-items: center;
+  gap: 28px;
+  margin-top: 16px;
+  padding: 22px 18px;
+  border: 1px solid var(--glass-border, var(--bp-line));
+  border-radius: 18px;
+  background: var(--glass-bg-inner, var(--bp-surface));
+}
+
+.chapter-donut {
+  position: relative;
+  aspect-ratio: 1;
+}
+
+.chapter-donut svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.chapter-slice {
+  stroke-width: 34px;
+  cursor: pointer;
+  opacity: 0;
+  transition: stroke-width 160ms ease, opacity 160ms ease;
+}
+
+/* Slices sweep in clockwise, each starting where the previous one ends. */
+.chapter-breakdown-body.is-visible .chapter-slice {
+  opacity: 1;
+  animation: chapter-slice-in 700ms cubic-bezier(0.22, 1, 0.36, 1) var(--slice-delay) both;
+}
+
+.chapter-slice.active {
+  stroke-width: 42px;
+}
+
+.chapter-breakdown-body:has(.chapter-slice.active) .chapter-slice:not(.active) {
+  opacity: 0.35;
+}
+
+.chapter-donut-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.chapter-donut-center strong {
+  font-family: var(--bp-display);
+  font-size: 1.8rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--bp-heading, #000e3f);
+}
+
+.chapter-donut-center span {
+  font-size: 0.78rem;
+  color: var(--bp-ink-muted);
+}
+
+.chapter-legend {
+  display: grid;
+  gap: 4px;
+  max-width: 520px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chapter-legend button {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto 48px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--bp-ink-muted);
+  cursor: pointer;
+}
+
+.chapter-legend button:hover,
+.chapter-legend button.active {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.chapter-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.chapter-name {
+  font-weight: 600;
+  color: var(--bp-heading, #000e3f);
+}
+
+.chapter-value,
+.chapter-share {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.chapter-share {
+  font-weight: 600;
+  color: var(--bp-heading, #000e3f);
+}
+
+@keyframes chapter-slice-in {
+  from {
+    stroke-dasharray: 0 999;
+  }
+  to {
+    stroke-dasharray: var(--slice-length) 999;
+  }
+}
+
+@media (max-width: 720px) {
+  .chapter-breakdown-body {
+    grid-template-columns: 1fr;
+  }
+
+  .chapter-donut {
+    width: min(240px, 100%);
+    margin: 0 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chapter-breakdown-body .chapter-slice {
+    animation: none;
+    opacity: 1;
+  }
+}
