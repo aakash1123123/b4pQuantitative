@@ -1,0 +1,337 @@
+/* ============================================================
+   Polish: layout, loading, phone and print fixes layered on top of
+   styles.css and glass.css.
+   ============================================================ */
+
+/* --- backdrop: a fixed layer instead of background-attachment: fixed,
+   which phones ignore (the gradient used to stop part way down). --- */
+body {
+  background: #e9efff;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60vw 50vh at 8% 0%, rgba(0, 105, 243, 0.28), transparent 70%),
+    radial-gradient(50vw 55vh at 100% 15%, rgba(203, 219, 255, 0.95), transparent 70%),
+    radial-gradient(55vw 50vh at 85% 100%, rgba(55, 60, 130, 0.22), transparent 70%),
+    radial-gradient(45vw 45vh at 0% 95%, rgba(0, 53, 162, 0.16), transparent 70%),
+    linear-gradient(160deg, #f4f7ff 0%, #e4ecff 55%, #dfe6fb 100%);
+}
+
+/* --- sticky tab bar --- */
+.tabs-section {
+  position: sticky;
+  top: 10px;
+  z-index: 20;
+}
+
+/* --- tabs: no jump on hover --- */
+.tab-button:hover {
+  transform: none;
+}
+
+/* --- even card heights --- */
+.donation-split {
+  align-items: stretch;
+}
+
+.donation-split > * {
+  display: flex;
+  flex-direction: column;
+}
+
+.donation-split .chapter-breakdown-body,
+.donation-split .shipment-mix-body {
+  flex: 1;
+}
+
+.kpi-analytics-grid {
+  align-items: stretch;
+}
+
+.kpi-analytics-grid > .summary-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.kpi-analytics-grid > .summary-card > .expiry-chart-card {
+  flex: 1;
+}
+
+.shipment-kpi-summary-pane,
+.shipment-kpi-current-table-panel {
+  align-self: stretch;
+}
+
+/* --- download report button, top right of the donation panel --- */
+.donation-history {
+  position: relative;
+}
+
+.donation-report-button {
+  position: absolute;
+  top: 22px;
+  right: 24px;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 720px) {
+  .donation-report-button {
+    top: 16px;
+    right: 16px;
+  }
+}
+
+/* --- empty states --- */
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.empty-state p {
+  margin: 0;
+  color: var(--bp-ink-muted);
+}
+
+/* --- loading skeletons --- */
+.skeleton-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.skeleton-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.skeleton {
+  border-radius: 16px;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 53, 162, 0.06) 0%,
+    rgba(0, 53, 162, 0.12) 50%,
+    rgba(0, 53, 162, 0.06) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-title {
+  width: min(320px, 70%);
+  height: 44px;
+}
+
+.skeleton-tile {
+  height: 84px;
+}
+
+.skeleton-chart {
+  height: 260px;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* --- phone and tablet --- */
+@media (max-width: 900px) {
+  /* minmax(0, …) so a wide table scrolls inside its card instead of
+     stretching the page sideways. */
+  .shipment-kpi-overview-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shipment-kpi-table-wrap {
+    overflow-x: auto;
+  }
+}
+
+/* Status bars stay on one row however narrow the screen. */
+.shipment-bar-chart-bars {
+  grid-template-columns: none;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+}
+
+@media (max-width: 720px) {
+  .tabs-section {
+    top: 6px;
+  }
+
+  .tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .tab-button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .shipment-subtabs {
+    flex-wrap: wrap;
+  }
+
+  .shipment-subtab {
+    flex: 1 1 140px;
+    padding: 12px 14px;
+  }
+
+  .shipment-bar-chart {
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .shipment-bar-chart-bars {
+    gap: 6px;
+  }
+
+  /* Status labels are long single words, so the bars scroll sideways
+     rather than break words mid-way. Grid lines move onto the bars row
+     so they scroll with it. */
+  .shipment-bar-chart-plot {
+    overflow-x: auto;
+  }
+
+  .shipment-bar-chart-grid {
+    display: none;
+  }
+
+  .shipment-bar-chart-bars {
+    grid-auto-columns: minmax(84px, 1fr);
+    min-width: max-content;
+    background: repeating-linear-gradient(to bottom, #ececec 0 1px, transparent 1px 44px) top / 100% 221px no-repeat;
+  }
+
+  .shipment-bar-chart-label {
+    font-size: 0.74rem;
+  }
+
+  .skeleton-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* Pie on top, legend underneath in one column. */
+  .expiry-chart-card .expiration-pie-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .expiry-chart-card .expiration-pie-legend {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --- motion: keep the chart reveals, drop everything else for people
+   who ask for less motion --- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* --- print: "Download report" saves the Shipment KPIs tab as a PDF --- */
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  body::before {
+    display: none;
+  }
+
+  html,
+  body {
+    min-height: 0 !important;
+    background: #ffffff !important;
+  }
+
+  #root {
+    min-height: 0;
+  }
+
+  /* Gradient-clipped text prints as a solid block, so use plain navy. */
+  .donation-total {
+    background: none !important;
+    -webkit-text-fill-color: #000e3f;
+    color: #000e3f;
+  }
+
+  .donation-chart-detail {
+    display: none !important;
+  }
+
+  /* The report is the donation history; working panels stay off paper. */
+  .top-bar,
+  .tabs-section,
+  .donation-report-button,
+  .page-shell > .panel:not(.donation-history) {
+    display: none !important;
+  }
+
+  .page-shell {
+    width: 100%;
+    padding: 0;
+  }
+
+  .panel {
+    box-shadow: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background: #ffffff !important;
+    border: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .donation-chart,
+  .donation-split > * {
+    break-inside: avoid;
+  }
+
+  /* Show charts fully drawn, whatever their animation state. */
+  .donation-line-svg {
+    clip-path: none !important;
+    animation: none !important;
+  }
+
+  .donation-area,
+  .donation-point-value {
+    opacity: 1 !important;
+    animation: none !important;
+  }
+
+  .donation-point-dot {
+    scale: 1 !important;
+    animation: none !important;
+  }
+
+  .chapter-slice {
+    opacity: 1 !important;
+    animation: none !important;
+  }
+
+  .donation-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
