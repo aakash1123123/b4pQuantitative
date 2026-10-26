@@ -635,3 +635,115 @@ def get_history():
         chapters=chapters,
         source=source,
     )
+
+
+# ==============================
+# PAST SHIPMENTS (Master Shipment Database, read-only)
+# ==============================
+MONTH_NUMBERS = {
+    name: index
+    for index, names in enumerate(
+        [
+            ("jan", "january"), ("feb", "february"), ("mar", "march"), ("apr", "april"),
+            ("may",), ("jun", "june"), ("jul", "july"), ("aug", "august"),
+            ("sep", "sept", "september"), ("oct", "october"), ("nov", "november"), ("dec", "december"),
+        ],
+        start=1,
+    )
+    for name in names
+}
+# Cells such as "N/A", "?????" or "--" mean the value wasn't recorded.
+MISSING_CELL_PATTERN = re.compile(r"^(n/?a|\?+|-+|unknown)?$", re.IGNORECASE)
+
+
+class PastShipment(BaseModel):
+    id: str
+    year: Optional[int] = None
+    month: Optional[int] = None
+    date_label: str
+    chapter: Optional[str] = None
+    destination: Optional[str] = None
+    recipient: Optional[str] = None
+    sponsor: Optional[str] = None
+    # Local or International (National counts as International), for filtering;
+    # type_label keeps the sheet's own wording.
+    shipment_type: Optional[str] = None
+    type_label: Optional[str] = None
+    transport: Optional[str] = None
+    transport_size: Optional[str] = None
+    pounds: Optional[float] = None
+    valuation: Optional[float] = None
+    shipping_cost: Optional[float] = None
+    boxes: Optional[str] = None
+    pallets: Optional[str] = None
+    hq_vpo: Optional[str] = None
+    coo_cp: Optional[str] = None
+    comments: Optional[str] = None
+    documentation_url: Optional[str] = None
+
+
+def history_cell(row: Dict[str, Any], header: str) -> Optional[str]:
+    text = re.sub(r"\s+", " ", str(row.get(header) or "")).strip()
+    return None if MISSING_CELL_PATTERN.match(text) else text
+
+
+def history_amount(row: Dict[str, Any], header: str) -> Optional[float]:
+    text = history_cell(row, header)
+    return parse_float(text) if text and re.search(r"\d", text) else None
+
+
+def parse_shipment_month(value: str) -> Tuple[Optional[int], Optional[int]]:
+    year_match = re.search(r"(19|20)\d{2}", value)
+    month_match = re.match(r"\s*([A-Za-z]+)", value)
+    month = MONTH_NUMBERS.get(month_match.group(1).lower()) if month_match else None
+    return (int(year_match.group()) if year_match else None), month
+
+
+def build_past_shipments(rows: List[Dict[str, Any]]) -> List[PastShipment]:
+    shipments = []
+    for index, row in enumerate(rows, start=2):
+        date_label = history_cell(row, "Date of Shipment") or ""
+        year, month = parse_shipment_month(date_label)
+        # Summary rows at the bottom of the sheet have no shipment date.
+        if year is None:
+            continue
+        link = history_cell(row, "Link to documentation of shipment")
+        shipments.append(
+            PastShipment(
+                id=f"master-{index}",
+                year=year,
+                month=month,
+                date_label=date_label,
+                chapter=history_cell(row, "Chapters"),
+                destination=history_cell(row, "Shipping Destination"),
+                recipient=history_cell(row, "Recipient Name"),
+                sponsor=history_cell(row, "Sponsor"),
+                shipment_type=normalize_history_shipment_type(row.get("Shipment Type")),
+                type_label=history_cell(row, "Shipment Type"),
+                transport=history_cell(row, "Transportation"),
+                transport_size=history_cell(row, "Transport Size"),
+                pounds=history_amount(row, "Poundage of shipments (lbs)"),
+                valuation=history_amount(row, "Estimated Shipment Valuation"),
+                shipping_cost=history_amount(row, "Shipment Cost"),
+                boxes=history_cell(row, "Number of Boxes"),
+                pallets=history_cell(row, "Number of Pallets"),
+                hq_vpo=history_cell(row, "HQ VPO"),
+                coo_cp=history_cell(row, "COO/CP"),
+                comments=history_cell(row, "Comments"),
+                documentation_url=link if link and link.startswith("https://") else None,
+            )
+        )
+    # Newest first; rows within the same month keep their sheet order reversed.
+    shipments.reverse()
+    shipments.sort(key=lambda shipment: (shipment.year or 0, shipment.month or 0), reverse=True)
+    return shipments
+
+
+@app.get("/history/shipments", response_model=List[PastShipment])
+def get_past_shipments():
+    try:
+        response = requests.get(HISTORY_SHEET_URL, timeout=15)
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"Unable to load the Master Shipment Database: {exc}") from exc
+    return build_past_shipments(list(csv.DictReader(StringIO(response.text))))
