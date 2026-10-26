@@ -255,3 +255,77 @@ th {
     background: rgba(255, 255, 255, 0.92);
   }
 }
+
+/* ============================================================
+   Gradients
+   Navy-to-blue fills for active and primary controls, gradient
+   numerals for headline figures, and a light top-left sheen on
+   glass surfaces.
+   ============================================================ */
+:root {
+  --grad-brand: linear-gradient(135deg, #000e3f 0%, #0035a2 55%, #0069f3 100%);
+  --grad-brand-hover: linear-gradient(135deg, #0035a2 0%, #0069f3 100%);
+  --grad-text: linear-gradient(120deg, #000e3f 0%, #0035a2 45%, #0069f3 100%);
+  --grad-sheen: linear-gradient(145deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.25) 45%, rgba(203, 219, 255, 0.35) 100%);
+}
+
+.tab-button.active,
+.tab-button.active:hover,
+.shipment-subtab.active,
+.primary-button {
+  background: var(--grad-brand);
+  border-color: transparent;
+  box-shadow: 0 6px 18px rgba(0, 53, 162, 0.28);
+}
+
+.primary-button:hover:not(:disabled) {
+  background: var(--grad-brand-hover);
+  border-color: transparent;
+}
+
+.primary-button:disabled {
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: none;
+}
+
+.metric-value,
+.title-block-value {
+  background: var(--grad-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.panel,
+.summary-card,
+.top-bar {
+  background-image: var(--grad-sheen);
+}
+
+.metric-card,
+.expiry-chart-card,
+.pallet-mini-chart-card,
+.shipment-card,
+.shipment-distribution-card,
+.kpi-note-card {
+  background-image: linear-gradient(160deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.35) 100%);
+}
+
+/* Gradient hairline along the top of the header. */
+.top-bar::after {
+  display: block;
+  height: 3px;
+  background: var(--grad-brand);
+}
+
+/* Size the gradient to the figure itself so short numbers still show it. */
+.metric-value,
+.title-block-value {
+  width: fit-content;
+}
+
+/* Secondary buttons sit on near-white cards; give them a visible edge. */
+.secondary-button {
+  border-color: rgba(0, 53, 162, 0.18);
+}
