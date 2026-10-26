@@ -830,6 +830,10 @@ table {
   margin-top: 28px;
 }
 
+.shipment-kpi-grid-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .shipment-kpi-column {
   display: grid;
   gap: 16px;

@@ -3285,6 +3285,41 @@ export default function App() {
     0
   );
 
+  // Shipment Mix sits beside the chapter breakdown in the donation section.
+  const shipmentMix = (
+    <div className="shipment-mix">
+      <div className="donation-chart-header">
+        <h3>Shipments by destination type</h3>
+      </div>
+      <div className="shipment-mix-body">
+        <ShipmentBarChart data={shipmentsByType.map((entry) => ({
+          label: entry.type,
+          count: entry.count,
+        }))} />
+      </div>
+      {donationHistory?.types?.length ? (
+        <>
+          <dl className="shipment-type-stats">
+            {shipmentsByType.map((entry) => (
+              <div key={entry.type}>
+                <dt>{entry.type}</dt>
+                <dd>
+                  <strong>{formatNumber(entry.count)}</strong> shipments
+                </dd>
+                <dd>{formatWholeCurrency(entry.valuation)} donated</dd>
+                <dd>{formatNumber(Math.round(entry.pounds))} lbs</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="shipment-type-note">
+            Includes past shipments from the Master Shipment Database. National shipments count as
+            International.
+          </p>
+        </>
+      ) : null}
+    </div>
+  );
+
   // Each tab is a sheet in the set; the title block names the one you're on.
   const sheetCodes = {
     inventory: "INV-01",
@@ -4944,7 +4979,7 @@ export default function App() {
 
       {!loading && !error && activeTab === "shipment-kpis" ? (
         <>
-        <DonationHistory history={donationHistory} error={donationHistoryError} />
+        <DonationHistory history={donationHistory} error={donationHistoryError} sideContent={shipmentMix} />
         <section className="panel">
           <div className="panel-header">
             <div>
@@ -5069,7 +5104,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="shipment-kpi-grid">
+          <div className="shipment-kpi-grid shipment-kpi-grid-single">
             <div className="shipment-kpi-column">
               <div className="summary-card shipment-status-card">
                 <div className="panel-header">
@@ -5085,45 +5120,6 @@ export default function App() {
                     count: entry.count,
                   }))} />
                 </div>
-              </div>
-            </div>
-
-            <div className="shipment-kpi-column">
-              <div className="summary-card shipment-mix-card">
-                <div className="panel-header">
-                  <div>
-                    <p className="section-label">Shipment Mix</p>
-                    <h3>Shipments by destination type</h3>
-                  </div>
-                </div>
-
-                <div className="expiry-chart-card">
-                  <ShipmentBarChart data={shipmentsByType.map((entry) => ({
-                    label: entry.type,
-                    count: entry.count,
-                  }))} />
-                </div>
-
-                {donationHistory?.types?.length ? (
-                  <>
-                  <dl className="shipment-type-stats">
-                    {shipmentsByType.map((entry) => (
-                      <div key={entry.type}>
-                        <dt>{entry.type}</dt>
-                        <dd>
-                          <strong>{formatNumber(entry.count)}</strong> shipments
-                        </dd>
-                        <dd>{formatWholeCurrency(entry.valuation)} donated</dd>
-                        <dd>{formatNumber(Math.round(entry.pounds))} lbs</dd>
-                      </div>
-                    ))}
-                  </dl>
-                  <p className="shipment-type-note">
-                    Includes past shipments from the Master Shipment Database. National shipments count as
-                    International.
-                  </p>
-                  </>
-                ) : null}
               </div>
             </div>
           </div>
