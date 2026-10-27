@@ -3293,14 +3293,6 @@ export default function App() {
     </div>
   );
 
-  // Each tab is a sheet in the set; the title block names the one you're on.
-  const sheetCodes = {
-    inventory: "INV-01",
-    kpis: "INV-02",
-    shipments: "SHP-03",
-    "shipment-kpis": "SHP-04",
-  };
-  const activeSheetCode = sheetCodes[activeTab] || "INV-01";
   const lastRefreshedLabel = lastRefreshedAt
     ? lastRefreshedAt.toLocaleTimeString(undefined, {
         hour: "2-digit",
@@ -3323,16 +3315,6 @@ export default function App() {
               <em>Blueprints for Pangaea</em>
               Operations Dashboard
             </h1>
-          </div>
-          <div className="title-block-cell">
-            <p className="title-block-label">Sheet</p>
-            <p className="title-block-value">{activeSheetCode}</p>
-          </div>
-          <div className="title-block-cell">
-            <p className="title-block-label">Entries</p>
-            <p className="title-block-value">
-              {loading || error ? "—" : formatNumber(inventoryRowsWithStatus.length)}
-            </p>
           </div>
           <div className="title-block-cell">
             <p className="title-block-label">Units on hand</p>
