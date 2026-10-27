@@ -654,3 +654,25 @@ body::before {
 
   --glass-line: rgba(20, 32, 69, 0.08);
 }
+
+/* --- destructive actions (delete shipment) --- */
+.secondary-button.danger-button {
+  color: var(--bp-red);
+  border-color: rgba(200, 50, 43, 0.35);
+}
+
+.secondary-button.danger-button:hover:not(:disabled) {
+  background: #fdecea;
+  border-color: var(--bp-red);
+}
+
+.primary-button.danger-button,
+.primary-button.danger-button:hover:not(:disabled) {
+  background: var(--bp-red);
+  border-color: transparent;
+  box-shadow: 0 6px 18px rgba(200, 50, 43, 0.25);
+}
+
+.primary-button.danger-button:hover:not(:disabled) {
+  background: #a8261f;
+}
