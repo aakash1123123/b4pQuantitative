@@ -523,10 +523,10 @@ body::before {
   display: grid;
   /* Year chart and map on top; chapters, destination type and the
      country list below, so they all fit on one screen. */
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-areas:
-    "year year year map map map"
-    "chapter chapter type type list list";
+    "year map"
+    "chapter type";
   gap: 0 24px;
   align-items: stretch;
   margin-top: 4px;
@@ -658,22 +658,11 @@ body::before {
 .donation-top-split .shipment-map { grid-area: map; }
 .donation-top-split .chapter-breakdown { grid-area: chapter; }
 .donation-top-split .shipment-mix { grid-area: type; }
-.donation-top-split .shipment-map-list { grid-area: list; }
-
-@media (max-width: 1200px) {
-  .donation-top-split {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-areas:
-      "year map"
-      "chapter type"
-      "list list";
-  }
-}
 
 @media (max-width: 760px) {
   .donation-top-split {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "year" "map" "chapter" "type" "list";
+    grid-template-areas: "year" "map" "chapter" "type";
   }
 
   .donation-top-split .chapter-breakdown-body {
@@ -740,4 +729,69 @@ body::before {
 
 .primary-button.danger-button:hover:not(:disabled) {
   background: #a8261f;
+}
+
+/* Destination type: two bars that carry their own count, value and pounds. */
+.type-bars {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  padding: 16px 18px 14px !important;
+}
+
+.type-bar-column {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 10px;
+  min-width: 0;
+}
+
+.type-bar-track {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 150px;
+  border-bottom: 2px solid var(--bp-line-strong);
+}
+
+.type-bar {
+  position: relative;
+  width: min(96px, 70%);
+  border-radius: 10px 10px 0 0;
+  background: #0069f3;
+  transition: height 0.6s ease;
+}
+
+.type-bar-count {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  right: 0;
+  color: #ffffff;
+  font-family: var(--bp-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* A short bar puts its count above instead of inside. */
+.type-bar.is-short .type-bar-count {
+  top: -30px;
+  color: var(--bp-heading);
+}
+
+.type-bar-label {
+  display: grid;
+  gap: 1px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--bp-ink-muted);
+}
+
+.type-bar-label strong {
+  font-family: var(--bp-display);
+  font-size: 0.98rem;
+  color: var(--bp-heading);
 }
