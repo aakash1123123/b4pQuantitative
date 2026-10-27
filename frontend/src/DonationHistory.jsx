@@ -296,12 +296,13 @@ export default function DonationHistory({ history, error, sideContent = null }) 
             {yearChange !== null ? (
               <p
                 className={yearChange >= 0 ? "donation-yoy is-up" : "donation-yoy is-down"}
+                aria-label={`${yearChange >= 0 ? "Up" : "Down"} ${Math.round(Math.abs(yearChange) * 100)}% year over year`}
                 title={`${latestYear.year}${latestYear.year === currentYear ? " so far" : ""}: ${formatCurrencyWhole(latestYear.valuation)} · ${priorYear.year}: ${formatCurrencyWhole(priorYear.valuation)}`}
               >
                 <span className="donation-yoy-change">
                   <span aria-hidden="true">{yearChange >= 0 ? "▲" : "▼"}</span>
                   {" "}
-                  {yearChange >= 0 ? "Up" : "Down"} {Math.round(Math.abs(yearChange) * 100)}%
+                  {Math.round(Math.abs(yearChange) * 100)}% YoY
                 </span>
                 <span className="donation-yoy-detail">
                   {latestYear.year}
