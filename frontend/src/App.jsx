@@ -1440,8 +1440,18 @@ export default function App() {
         fetch(`${API_BASE}/kpis`),
       ]);
 
-      if (!itemsResponse.ok || !kpisResponse.ok) {
-        throw new Error("The dashboard could not load data from the backend.");
+      const failedResponse = [itemsResponse, kpisResponse].find((response) => !response.ok);
+      if (failedResponse) {
+        const body = await failedResponse.text().catch(() => "");
+        let detail = body.slice(0, 300);
+        try {
+          detail = JSON.parse(body).detail ?? detail;
+        } catch {
+          // Not JSON; keep the raw text.
+        }
+        throw new Error(
+          `The dashboard could not load data from the backend (${failedResponse.status} on ${new URL(failedResponse.url).pathname})${detail ? `: ${detail}` : "."}`
+        );
       }
 
       const [itemsData, kpisData] = await Promise.all([
