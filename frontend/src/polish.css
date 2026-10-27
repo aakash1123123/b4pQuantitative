@@ -631,3 +631,26 @@ body::before {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ============================================================
+   Palette: neutrals tinted toward the brand navy instead of flat
+   grays, so text, lines and surfaces sit with the blues.
+   ============================================================ */
+:root {
+  --bp-ink: #142045;
+  --bp-ink-strong: #0f1a3a;
+  --bp-ink-muted: #56607a;
+  --bp-ink-faint: #8a93a8;
+
+  --bp-line: #dfe5f1;
+  --bp-line-strong: #ccd5e6;
+
+  --bp-surface: #ffffff;
+  --bp-surface-raised: #f8fafe;
+  --bp-surface-sunken: #f1f4fa;
+  --bp-sheet: #eef2fb;
+
+  --bp-red: #c8322b;
+
+  --glass-line: rgba(20, 32, 69, 0.08);
+}
