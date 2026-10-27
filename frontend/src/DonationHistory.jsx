@@ -394,9 +394,8 @@ export default function DonationHistory({ history, error, sideContent = null }) 
         {history?.chapters?.length ? (
           <ChapterBreakdown chapters={history.chapters} visible={seen && Boolean(history)} />
         ) : null}
+        {sideContent}
       </div>
-
-      {sideContent ? <div className="donation-mix-row">{sideContent}</div> : null}
 
       {history?.source === "snapshot" ? (
         <p className="donation-footnote">
