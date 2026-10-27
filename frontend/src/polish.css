@@ -6,7 +6,7 @@
 /* --- backdrop: a fixed layer instead of background-attachment: fixed,
    which phones ignore (the gradient used to stop part way down). --- */
 body {
-  background: #e9efff;
+  background: #eef2fb;
 }
 
 body::before {
@@ -15,12 +15,10 @@ body::before {
   inset: 0;
   z-index: -1;
   pointer-events: none;
+  /* One soft wash of brand blue, top left, over a flat pale background. */
   background:
-    radial-gradient(60vw 50vh at 8% 0%, rgba(0, 105, 243, 0.28), transparent 70%),
-    radial-gradient(50vw 55vh at 100% 15%, rgba(203, 219, 255, 0.95), transparent 70%),
-    radial-gradient(55vw 50vh at 85% 100%, rgba(55, 60, 130, 0.22), transparent 70%),
-    radial-gradient(45vw 45vh at 0% 95%, rgba(0, 53, 162, 0.16), transparent 70%),
-    linear-gradient(160deg, #f4f7ff 0%, #e4ecff 55%, #dfe6fb 100%);
+    radial-gradient(70vw 60vh at 0% 0%, rgba(0, 105, 243, 0.1), transparent 70%),
+    #eef2fb;
 }
 
 /* --- sticky tab bar --- */
@@ -331,7 +329,159 @@ body::before {
     animation: none !important;
   }
 
-  .donation-split {
+  .donation-top-split,
+  .donation-mix-row .shipment-mix {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .donation-year,
+  .donation-top-split .chapter-breakdown,
+  .donation-mix-row {
+    break-inside: avoid;
+  }
+}
+
+/* ============================================================
+   Fewer gradients: solid brand colors for controls, numbers and bars.
+   The glass surfaces and the chart's soft area fill stay.
+   ============================================================ */
+:root {
+  --grad-brand: #0035a2;
+  --grad-brand-hover: #0069f3;
+}
+
+.tab-button.active,
+.tab-button.active:hover,
+.shipment-subtab.active,
+.primary-button {
+  box-shadow: 0 2px 8px rgba(0, 53, 162, 0.18);
+}
+
+.metric-value,
+.title-block-value,
+.donation-total {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--bp-heading, #000e3f);
+}
+
+.metric-value,
+.title-block-value {
+  -webkit-text-fill-color: #0035a2;
+  color: #0035a2;
+}
+
+/* No sheen layer on the glass panels and cards. */
+.panel,
+.summary-card,
+.top-bar,
+.metric-card,
+.expiry-chart-card,
+.pallet-mini-chart-card,
+.shipment-card,
+.shipment-distribution-card,
+.kpi-note-card {
+  background-image: none;
+}
+
+.shipment-bar-chart-bar {
+  background: #0069f3;
+}
+
+.shipment-bar-chart-bar-secondary {
+  background: #7fa9f5;
+}
+
+.expiry-bar-fill {
+  background: #0069f3;
+}
+
+.expiry-bar-fill-secondary {
+  background: #7fa9f5;
+}
+
+/* ============================================================
+   Shipment KPIs layout: value-by-year chart with the chapter pie
+   beside it, then Shipment Mix across the full width.
+   ============================================================ */
+.donation-top-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.donation-year,
+.donation-top-split .chapter-breakdown {
+  display: flex;
+  flex-direction: column;
+}
+
+.donation-year .donation-chart,
+.donation-top-split .chapter-breakdown-body {
+  flex: 1;
+}
+
+.donation-top-split .chapter-breakdown-body {
+  grid-template-columns: minmax(120px, 170px) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.donation-top-split .chapter-legend button {
+  gap: 8px;
+  padding: 7px 8px;
+}
+
+.donation-mix-row {
+  margin-top: 28px;
+}
+
+/* Bar chart on the left, the Local / International tiles on the right. */
+.donation-mix-row .shipment-mix {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  column-gap: 24px;
+  align-items: start;
+}
+
+.donation-mix-row .shipment-mix > .donation-chart-header,
+.donation-mix-row .shipment-mix > .shipment-type-note {
+  grid-column: 1 / -1;
+}
+
+.donation-mix-row .shipment-mix > .donation-chart-header {
+  margin-top: 0;
+}
+
+.donation-mix-row .shipment-type-stats {
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 16px;
+}
+
+@media (max-width: 1100px) {
+  .donation-top-split,
+  .donation-mix-row .shipment-mix {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .donation-mix-row .shipment-type-stats {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .donation-top-split .chapter-breakdown-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Header: two count cells now that the sheet code and entries are gone. */
+.title-block {
+  grid-template-columns: minmax(0, 1.5fr) repeat(2, minmax(0, auto));
+}
+
+@media (max-width: 900px) {
+  .title-block {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

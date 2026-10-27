@@ -308,97 +308,95 @@ export default function DonationHistory({ history, error, sideContent = null }) 
         </dl>
       </div>
 
-      <div className="donation-chart-header">
-        <h3>Donated value by year</h3>
-        <p className="donation-chart-detail">
-          {active
-            ? `${active.year}: ${formatCurrencyWhole(active.valuation)} · ${formatPounds(active.pounds)} · ${active.shipments} shipment${active.shipments === 1 ? "" : "s"}`
-            : "Hover or tap a point for that year's poundage and shipment count."}
-        </p>
-      </div>
+      <div className="donation-top-split">
+        <div className="donation-year">
+          <div className="donation-chart-header">
+            <h3>Donated value by year</h3>
+            <p className="donation-chart-detail">
+              {active
+                ? `${active.year}: ${formatCurrencyWhole(active.valuation)} · ${formatPounds(active.pounds)} · ${active.shipments} shipment${active.shipments === 1 ? "" : "s"}`
+                : "Hover or tap a point for that year's poundage and shipment count."}
+            </p>
+          </div>
 
-      <div
-        className={seen && history ? "donation-chart is-visible" : "donation-chart"}
-        role="list"
-        aria-label="Donated value by year"
-      >
-        <div className="donation-plot">
-          <svg
-            className="donation-line-svg"
-            viewBox="0 0 1000 100"
-            preserveAspectRatio="none"
-            aria-hidden="true"
+          <div
+            className={seen && history ? "donation-chart is-visible" : "donation-chart"}
+            role="list"
+            aria-label="Donated value by year"
           >
-            <defs>
-              <linearGradient id="donation-area-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0069f3" stopOpacity="0.32" />
-                <stop offset="100%" stopColor="#0069f3" stopOpacity="0" />
-              </linearGradient>
-              <linearGradient id="donation-line-stroke" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#000e3f" />
-                <stop offset="55%" stopColor="#0035a2" />
-                <stop offset="100%" stopColor="#0069f3" />
-              </linearGradient>
-            </defs>
-            {points.length ? (
-              <>
-                <path className="donation-area" d={areaPath} fill="url(#donation-area-fill)" />
-                <path
-                  className="donation-line"
-                  d={linePath}
-                  fill="none"
-                  stroke="url(#donation-line-stroke)"
-                  vectorEffect="non-scaling-stroke"
-                />
-              </>
-            ) : null}
-          </svg>
+            <div className="donation-plot">
+              <svg
+                className="donation-line-svg"
+                viewBox="0 0 1000 100"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <defs>
+                  <linearGradient id="donation-area-fill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#0069f3" stopOpacity="0.16" />
+                    <stop offset="100%" stopColor="#0069f3" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {points.length ? (
+                  <>
+                    <path className="donation-area" d={areaPath} fill="url(#donation-area-fill)" />
+                    <path
+                      className="donation-line"
+                      d={linePath}
+                      fill="none"
+                      stroke="#0035a2"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </>
+                ) : null}
+              </svg>
 
-          {points.map((point, index) => (
-            <button
-              key={point.year}
-              type="button"
-              role="listitem"
-              className={point.year === activeYear ? "donation-point active" : "donation-point"}
-              style={{
-                "--x": `${point.x / 10}%`,
-                "--y": `${point.y}%`,
-                "--point-delay": `${(index / Math.max(points.length - 1, 1)) * LINE_DRAW_MS}ms`,
-              }}
-              onMouseEnter={() => setActiveYear(point.year)}
-              onMouseLeave={() => setActiveYear(null)}
-              onFocus={() => setActiveYear(point.year)}
-              onBlur={() => setActiveYear(null)}
-              onClick={() => setActiveYear(point.year)}
-              aria-label={`${point.year}: ${formatCurrencyWhole(point.valuation)}, ${formatPounds(point.pounds)}, ${point.shipments} shipments`}
-            >
-              <span className="donation-point-value">{formatCompactCurrency(point.valuation)}</span>
-              <span className="donation-point-dot" />
-            </button>
-          ))}
+              {points.map((point, index) => (
+                <button
+                  key={point.year}
+                  type="button"
+                  role="listitem"
+                  className={point.year === activeYear ? "donation-point active" : "donation-point"}
+                  style={{
+                    "--x": `${point.x / 10}%`,
+                    "--y": `${point.y}%`,
+                    "--point-delay": `${(index / Math.max(points.length - 1, 1)) * LINE_DRAW_MS}ms`,
+                  }}
+                  onMouseEnter={() => setActiveYear(point.year)}
+                  onMouseLeave={() => setActiveYear(null)}
+                  onFocus={() => setActiveYear(point.year)}
+                  onBlur={() => setActiveYear(null)}
+                  onClick={() => setActiveYear(point.year)}
+                  aria-label={`${point.year}: ${formatCurrencyWhole(point.valuation)}, ${formatPounds(point.pounds)}, ${point.shipments} shipments`}
+                >
+                  <span className="donation-point-value">{formatCompactCurrency(point.valuation)}</span>
+                  <span className="donation-point-dot" />
+                </button>
+              ))}
+            </div>
+
+            <div className="donation-x-axis" aria-hidden="true">
+              {points.map((point) => (
+                <span
+                  key={point.year}
+                  className={point.year === activeYear ? "active" : ""}
+                  style={{ "--x": `${point.x / 10}%` }}
+                >
+                  <span className="donation-year-full">{point.year}</span>
+                  <span className="donation-year-short">&rsquo;{String(point.year).slice(-2)}</span>
+                  {point.year === currentYear ? <small> YTD</small> : null}
+                </span>
+              ))}
+            </div>
+          </div>
+
         </div>
-
-        <div className="donation-x-axis" aria-hidden="true">
-          {points.map((point) => (
-            <span
-              key={point.year}
-              className={point.year === activeYear ? "active" : ""}
-              style={{ "--x": `${point.x / 10}%` }}
-            >
-              <span className="donation-year-full">{point.year}</span>
-              <span className="donation-year-short">&rsquo;{String(point.year).slice(-2)}</span>
-              {point.year === currentYear ? <small> YTD</small> : null}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <div className="donation-split">
         {history?.chapters?.length ? (
           <ChapterBreakdown chapters={history.chapters} visible={seen && Boolean(history)} />
         ) : null}
-        {sideContent}
       </div>
+
+      {sideContent ? <div className="donation-mix-row">{sideContent}</div> : null}
 
       {history?.source === "snapshot" ? (
         <p className="donation-footnote">
