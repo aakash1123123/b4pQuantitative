@@ -6,7 +6,7 @@
 /* --- backdrop: a fixed layer instead of background-attachment: fixed,
    which phones ignore (the gradient used to stop part way down). --- */
 body {
-  background: #e9efff;
+  background: #eef2fb;
 }
 
 body::before {
@@ -15,12 +15,10 @@ body::before {
   inset: 0;
   z-index: -1;
   pointer-events: none;
+  /* One soft wash of brand blue, top left, over a flat pale background. */
   background:
-    radial-gradient(60vw 50vh at 8% 0%, rgba(0, 105, 243, 0.28), transparent 70%),
-    radial-gradient(50vw 55vh at 100% 15%, rgba(203, 219, 255, 0.95), transparent 70%),
-    radial-gradient(55vw 50vh at 85% 100%, rgba(55, 60, 130, 0.22), transparent 70%),
-    radial-gradient(45vw 45vh at 0% 95%, rgba(0, 53, 162, 0.16), transparent 70%),
-    linear-gradient(160deg, #f4f7ff 0%, #e4ecff 55%, #dfe6fb 100%);
+    radial-gradient(70vw 60vh at 0% 0%, rgba(0, 105, 243, 0.1), transparent 70%),
+    #eef2fb;
 }
 
 /* --- sticky tab bar --- */
@@ -331,7 +329,328 @@ body::before {
     animation: none !important;
   }
 
-  .donation-split {
+  .donation-top-split {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .donation-top-split > * {
+    break-inside: avoid;
+  }
+}
+
+/* ============================================================
+   Fewer gradients: solid brand colors for controls, numbers and bars.
+   The glass surfaces and the chart's soft area fill stay.
+   ============================================================ */
+:root {
+  --grad-brand: #0035a2;
+  --grad-brand-hover: #0069f3;
+}
+
+.tab-button.active,
+.tab-button.active:hover,
+.shipment-subtab.active,
+.primary-button {
+  box-shadow: 0 2px 8px rgba(0, 53, 162, 0.18);
+}
+
+.metric-value,
+.title-block-value,
+.donation-total {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--bp-heading, #000e3f);
+}
+
+.metric-value,
+.title-block-value {
+  -webkit-text-fill-color: #0035a2;
+  color: #0035a2;
+}
+
+/* No sheen layer on the glass panels and cards. */
+.panel,
+.summary-card,
+.top-bar,
+.metric-card,
+.expiry-chart-card,
+.pallet-mini-chart-card,
+.shipment-card,
+.shipment-distribution-card,
+.kpi-note-card {
+  background-image: none;
+}
+
+.shipment-bar-chart-bar {
+  background: #0069f3;
+}
+
+.shipment-bar-chart-bar-secondary {
+  background: #7fa9f5;
+}
+
+.expiry-bar-fill {
+  background: #0069f3;
+}
+
+.expiry-bar-fill-secondary {
+  background: #7fa9f5;
+}
+
+/* ============================================================
+   Shipment KPIs layout: a compact headline, then the year chart,
+   chapter pie and destination type side by side, so all three fit
+   on the first screen.
+   ============================================================ */
+.donation-total {
+  font-size: clamp(2.2rem, 4.4vw, 3.4rem);
+}
+
+.donation-hero {
+  gap: 16px;
+}
+
+/* Year-over-year badge beside the donated total. The arrow carries the
+   direction, so it never relies on color alone. */
+.donation-total-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.donation-yoy {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 14px;
+  line-height: 1.2;
+}
+
+.donation-yoy-change {
+  font-family: var(--bp-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.donation-yoy-detail {
+  font-size: 0.74rem;
+  color: var(--bp-ink-muted);
+  white-space: nowrap;
+}
+
+.donation-yoy.is-up {
+  background: #e3f5ec;
+}
+
+.donation-yoy.is-up .donation-yoy-change {
+  color: #0d7a43;
+}
+
+.donation-yoy.is-down {
+  background: #fde8e6;
+}
+
+.donation-yoy.is-down .donation-yoy-change {
+  color: #b42318;
+}
+
+.donation-stats div {
+  padding: 10px 14px;
+}
+
+.donation-stats dd {
+  font-size: 1.2rem;
+}
+
+.donation-top-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr) minmax(0, 0.85fr);
+  gap: 20px;
+  align-items: stretch;
+  margin-top: 4px;
+}
+
+.donation-top-split > * {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.donation-top-split .donation-chart-header {
+  margin-top: 20px;
+}
+
+/* Hover hints take a line of their own under the heading. */
+.donation-top-split .donation-chart-header {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.donation-top-split .donation-chart-detail {
+  font-size: 0.78rem;
+}
+
+.donation-top-split .donation-chart,
+.donation-top-split .chapter-breakdown-body,
+.donation-top-split .shipment-mix-body {
+  margin-top: 12px;
+}
+
+.donation-year .donation-chart {
+  flex: 1;
+  padding: 18px 14px 8px;
+}
+
+.donation-year .donation-plot {
+  height: 210px;
+}
+
+.donation-year .donation-point-value {
+  padding: 1px 4px;
+  font-size: 0.64rem;
+}
+
+.donation-top-split .chapter-breakdown-body {
+  flex: 1;
+  grid-template-columns: minmax(96px, 120px) minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px 12px;
+}
+
+.donation-top-split .chapter-donut-center strong {
+  font-size: 1.4rem;
+}
+
+.donation-top-split .chapter-legend {
+  gap: 0;
+}
+
+.donation-top-split .chapter-legend button {
+  grid-template-columns: 10px minmax(0, 1fr) auto 40px;
+  gap: 8px;
+  padding: 5px 6px;
+  font-size: 0.88rem;
+}
+
+.donation-top-split .shipment-mix-body {
+  padding: 14px 12px 6px;
+}
+
+/* Compact bar chart for the destination-type card. */
+.shipment-bar-chart-compact .shipment-bar-chart-y-axis {
+  height: 130px;
+  margin-bottom: 40px;
+  font-size: 0.74rem;
+}
+
+.shipment-bar-chart-compact .shipment-bar-chart-plot,
+.shipment-bar-chart-compact .shipment-bar-chart-bars {
+  height: 170px;
+}
+
+.shipment-bar-chart-compact .shipment-bar-chart-grid {
+  inset: 0 0 40px 0;
+}
+
+/* 130px bars + 8px gap + 32px label row = the 170px plot, so the bar
+   bottoms land exactly on the baseline 40px up from the bottom. */
+.shipment-bar-chart-compact .shipment-bar-chart-column {
+  grid-template-rows: 130px 32px;
+  gap: 8px;
+  align-content: start;
+}
+
+.shipment-bar-chart-compact .shipment-bar-chart-bar-wrap {
+  height: 130px;
+  max-width: 56px;
+}
+
+.shipment-bar-chart-compact .shipment-bar-chart-label {
+  font-size: 0.8rem;
+}
+
+.donation-top-split .shipment-type-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.donation-top-split .shipment-type-stats > div {
+  padding: 8px 10px;
+}
+
+.donation-top-split .shipment-type-stats dd {
+  font-size: 0.78rem;
+}
+
+.donation-top-split .shipment-type-stats dd strong {
+  font-size: 1.1rem;
+}
+
+.donation-top-split .shipment-type-note {
+  font-size: 0.72rem;
+}
+
+/* Medium screens: year chart across the top, pie and destination type below. */
+@media (max-width: 1300px) {
+  .donation-top-split {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .donation-year {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .donation-top-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .donation-top-split .chapter-breakdown-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .donation-top-split .chapter-donut {
+    width: min(200px, 100%);
+    margin: 0 auto;
+  }
+}
+
+/* Header: two count cells now that the sheet code and entries are gone. */
+.title-block {
+  grid-template-columns: minmax(0, 1.5fr) repeat(2, minmax(0, auto));
+}
+
+@media (max-width: 900px) {
+  .title-block {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ============================================================
+   Palette: neutrals tinted toward the brand navy instead of flat
+   grays, so text, lines and surfaces sit with the blues.
+   ============================================================ */
+:root {
+  --bp-ink: #142045;
+  --bp-ink-strong: #0f1a3a;
+  --bp-ink-muted: #56607a;
+  --bp-ink-faint: #8a93a8;
+
+  --bp-line: #dfe5f1;
+  --bp-line-strong: #ccd5e6;
+
+  --bp-surface: #ffffff;
+  --bp-surface-raised: #f8fafe;
+  --bp-surface-sunken: #f1f4fa;
+  --bp-sheet: #eef2fb;
+
+  --bp-red: #c8322b;
+
+  --glass-line: rgba(20, 32, 69, 0.08);
 }
