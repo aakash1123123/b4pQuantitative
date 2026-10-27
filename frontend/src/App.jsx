@@ -689,8 +689,8 @@ const expirationBucketColors = {
   "90-180 days": "#D35F2A",
   "180-365 days": "#D98038",
   "365+ days": "#1E7A43",
-  "No expiration": "#7D7D7D",
-  "No expiration date": "#7D7D7D",
+  "No expiration": "#a9b3c8",
+  "No expiration date": "#a9b3c8",
 };
 
 // Warehouse duration is a magnitude, so it gets one hue light-to-dark --
@@ -719,20 +719,20 @@ const durationBucketOrder = [
 // which is what keeps identity off colour alone.
 const categoryPiePalette = [
   "#0069f3",
-  "#B87F00",
-  "#1E4FC4",
-  "#4E9A00",
-  "#5B57D8",
-  "#6F8A00",
-  "#8E4EC6",
-  "#E4670A",
-  "#A03C9E",
-  "#9A7A00",
-  "#2E6FB8",
-  "#2F8F2F",
+  "#f0643c",
+  "#12a58a",
+  "#e29b00",
+  "#d9609e",
+  "#5a4fcf",
+  "#2f8a2f",
+  "#a63d7a",
+  "#2c4aa6",
+  "#c0582a",
+  "#008a7c",
+  "#8a6c00",
 ];
 // Anything past the fixed order is not given a new hue -- it goes neutral.
-const categoryOverflowColor = "#7D7D7D";
+const categoryOverflowColor = "#8a93a8";
 
 // The fixed order mirrors the backend's approved category list, so a category
 // keeps the same hue no matter what is filtered out, shipped, or missing from
@@ -764,12 +764,12 @@ function colorForBoxType(index) {
 }
 
 const valueBucketOrder = ["$0-$50", "$50-$100", "$100-$200", "$200+"];
-// Price bands are a magnitude: one hue, light to dark. Validated ordinal.
+// Price bands are a magnitude: one hue (brand slate), light to dark.
 const valueBucketColors = {
-  "$0-$50": "#B4B4B4",
-  "$50-$100": "#8A8A8A",
-  "$100-$200": "#5E5E5E",
-  "$200+": "#333333",
+  "$0-$50": "#a3b1cf",
+  "$50-$100": "#7387b3",
+  "$100-$200": "#4a5f91",
+  "$200+": "#263a6b",
 };
 
 const supplyStatusOrder = ["Inventory", "Pulled", "Consolidated"];
@@ -785,11 +785,11 @@ const supplyStatusColors = {
 // box type keeps the same hue it has in the category chart.
 const boxCategoryPalette = [
   "#0069f3",
-  "#B87F00",
-  "#1E4FC4",
-  "#4E9A00",
-  "#5B57D8",
-  "#6F8A00",
+  "#f0643c",
+  "#12a58a",
+  "#e29b00",
+  "#d9609e",
+  "#5a4fcf",
 ];
 
 function valueBucketForUnitPrice(unitPrice) {
@@ -1167,7 +1167,7 @@ function ShipmentExpirationChart({ shipmentItems }) {
           0
         ),
         entries: matchingItems.length,
-        color: expirationBucketColors[label] || "#4a90e2",
+        color: expirationBucketColors[label] || "#8a93a8",
       };
     })
     .filter((segment) => segment.value > 0);
@@ -2769,7 +2769,7 @@ export default function App() {
       label: range,
       value: values?.raw_items ?? 0,
       entries: values?.entries ?? 0,
-      color: expirationBucketColors[range] || "#4a90e2",
+      color: expirationBucketColors[range] || "#8a93a8",
     }))
     .filter((segment) => segment.value > 0);
   const totalExpirationChartItems = expirationChartSegments.reduce(
@@ -2793,7 +2793,7 @@ export default function App() {
       label: bucketLabel,
       value: rawItems,
       entries: matchingRows.length,
-      color: durationBucketColors[bucketLabel] || "#4a90e2",
+      color: durationBucketColors[bucketLabel] || "#8a93a8",
     };
   });
   const totalDurationChartItems = durationChartData.reduce(
@@ -2931,7 +2931,7 @@ export default function App() {
         value: rawItems,
         total: activePalletTotalSupplies,
         percentage: percentOfTotal(rawItems, activePalletTotalSupplies),
-        color: expirationBucketColors[bucket.value] || "#4a90e2",
+        color: expirationBucketColors[bucket.value] || "#8a93a8",
       };
     })
     .filter((segment) => segment.value > 0);
@@ -2945,7 +2945,7 @@ export default function App() {
         value: rawItems,
         total: activePalletTotalSupplies,
         percentage: percentOfTotal(rawItems, activePalletTotalSupplies),
-        color: durationBucketColors[bucketLabel] || "#4a90e2",
+        color: durationBucketColors[bucketLabel] || "#8a93a8",
       };
     })
     .filter((segment) => segment.value > 0);

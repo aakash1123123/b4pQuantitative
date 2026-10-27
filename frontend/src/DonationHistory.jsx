@@ -34,7 +34,9 @@ function formatPounds(value) {
 
 // Categorical slots in fixed order (brand blue first); validated for
 // colorblind separation. Chapters keep their slot by rank in the totals.
-const CHAPTER_COLORS = ["#0069f3", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6"];
+// Brand categorical palette, shared with the inventory charts (validated:
+// lightness band, chroma, CVD and normal-vision separation on white).
+const CHAPTER_COLORS = ["#0069f3", "#f0643c", "#12a58a", "#e29b00", "#d9609e", "#5a4fcf", "#2f8a2f"];
 const DONUT_RADIUS = 70;
 const DONUT_CIRCUMFERENCE = 2 * Math.PI * DONUT_RADIUS;
 // Surface-colored gap between slices, in SVG units along the ring.
