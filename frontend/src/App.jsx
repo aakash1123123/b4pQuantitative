@@ -4995,11 +4995,13 @@ export default function App() {
           sideContent={shipmentMix}
           yearFilter={historyYearFilter}
           rangeLabel={historyRangeLabel}
-        />
-        <ShipmentMap
-          shipments={yearFilteredHistoryShipments}
-          error={historyShipmentsError}
-          rangeLabel={historyRangeLabel}
+          mapContent={
+            <ShipmentMap
+              shipments={yearFilteredHistoryShipments}
+              error={historyShipmentsError}
+              rangeLabel={historyRangeLabel}
+            />
+          }
         />
         <section className="panel">
           <div className="panel-header">

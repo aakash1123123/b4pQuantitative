@@ -251,6 +251,7 @@ export default function DonationHistory({
   allYears = null,
   error,
   sideContent = null,
+  mapContent = null,
   yearFilter = null,
   rangeLabel = "",
 }) {
@@ -431,6 +432,7 @@ export default function DonationHistory({
           </div>
 
         </div>
+        {mapContent}
         {history?.chapters?.length ? (
           <ChapterBreakdown chapters={history.chapters} visible={seen && Boolean(history)} />
         ) : null}

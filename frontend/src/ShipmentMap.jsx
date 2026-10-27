@@ -4,7 +4,8 @@ import { feature } from "topojson-client";
 import "./ShipmentMap.css";
 
 const WIDTH = 960;
-const HEIGHT = 470;
+// The map is drawn at most this tall on screen, so it fits beside the year chart.
+const MAX_DISPLAY_HEIGHT = 250;
 const MAX_RADIUS = 30;
 const MIN_RADIUS = 4.5;
 
@@ -105,12 +106,16 @@ export default function ShipmentMap({ shipments, error: loadError, rangeLabel })
 
   const { countries, partners } = useMemo(() => aggregate(shipments ?? []), [shipments]);
 
-  const projection = useMemo(() => {
+  const { projection, height } = useMemo(() => {
     const base = geoNaturalEarth1();
-    if (world) {
-      base.fitExtent([[4, 4], [WIDTH - 4, HEIGHT - 4]], { type: "FeatureCollection", features: world });
+    if (!world) {
+      return { projection: base, height: 470 };
     }
-    return base;
+    const collection = { type: "FeatureCollection", features: world };
+    base.fitWidth(WIDTH - 8, collection);
+    const [[, top], [, bottom]] = geoPath(base).bounds(collection);
+    base.translate([base.translate()[0] + 4, base.translate()[1] - top + 4]);
+    return { projection: base, height: Math.ceil(bottom - top + 8) };
   }, [world]);
   const path = useMemo(() => geoPath(projection), [projection]);
 
@@ -125,68 +130,83 @@ export default function ShipmentMap({ shipments, error: loadError, rangeLabel })
   const loading = !error && (!shipments || !world);
 
   return (
-    <section className="panel shipment-map" aria-labelledby="shipment-map-title">
-      <div className="panel-header">
-        <div>
-          <h2 id="shipment-map-title">Where our supplies have gone{rangeLabel ? `, ${rangeLabel}` : ""}</h2>
-          <p className="shipment-map-subtitle">
-            Bubble size is the total donated value sent to each country. Hover a bubble or a row for details.
+    <>
+      <div className="shipment-map" aria-labelledby="shipment-map-title">
+        <div className="donation-chart-header">
+          <h3 id="shipment-map-title">Where our supplies have gone{rangeLabel ? `, ${rangeLabel}` : ""}</h3>
+          <p className="donation-chart-detail">
+            Bubble size is donated value per country. Hover a bubble for details.
           </p>
         </div>
+
+        {error ? <p className="shipment-map-message">{error}</p> : null}
+        {loading ? <div className="shipment-map-skeleton" aria-busy="true" /> : null}
+
+        {!loading && !error ? (
+          <div className="shipment-map-canvas">
+            <div
+              className="shipment-map-stage"
+              style={{ maxWidth: `${(MAX_DISPLAY_HEIGHT * WIDTH) / height}px` }}
+            >
+              <svg
+                viewBox={`0 0 ${WIDTH} ${height}`}
+                role="img"
+                aria-label="World map of donated value by destination country"
+              >
+                <g>
+                  {world.map((country) => (
+                    <path
+                      key={country.id ?? country.properties.name}
+                      d={path(country)}
+                      className={reached.has(country.properties.name) ? "is-reached" : undefined}
+                    />
+                  ))}
+                </g>
+                {/* Largest first so small bubbles stay on top and hoverable. */}
+                <g>
+                  {bubbles.map((entry) => (
+                    <g
+                      key={entry.name}
+                      className={`shipment-map-bubble${active === entry.name ? " is-active" : ""}`}
+                      onMouseEnter={() => setActive(entry.name)}
+                      onMouseLeave={() => setActive(null)}
+                      onClick={() => setActive(active === entry.name ? null : entry.name)}
+                    >
+                      <circle cx={entry.x} cy={entry.y} r={Math.max(entry.radius, 12)} className="hit" />
+                      <circle cx={entry.x} cy={entry.y} r={entry.radius} className="mark" />
+                    </g>
+                  ))}
+                </g>
+              </svg>
+              {activeBubble ? (
+                <div
+                  className="shipment-map-tooltip"
+                  style={{
+                    left: `${(activeBubble.x / WIDTH) * 100}%`,
+                    top: `${((activeBubble.y - activeBubble.radius) / height) * 100}%`,
+                  }}
+                  role="status"
+                >
+                  <strong>{activeBubble.name}</strong>
+                  <span>{formatCurrency(activeBubble.valuation)} donated</span>
+                  <span>
+                    {formatNumber(activeBubble.shipments)} shipment{activeBubble.shipments === 1 ? "" : "s"} ·{" "}
+                    {formatNumber(activeBubble.pounds)} lbs
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </div>
 
-      {error ? <p className="shipment-map-message">{error}</p> : null}
-      {loading ? <div className="shipment-map-skeleton" aria-busy="true" /> : null}
-
       {!loading && !error ? (
-        <div className="shipment-map-body">
-          <div className="shipment-map-canvas">
-            <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="World map of donated value by destination country">
-              <g>
-                {world.map((country) => (
-                  <path
-                    key={country.id ?? country.properties.name}
-                    d={path(country)}
-                    className={reached.has(country.properties.name) ? "is-reached" : undefined}
-                  />
-                ))}
-              </g>
-              {/* Largest first so small bubbles stay on top and hoverable. */}
-              <g>
-                {bubbles.map((entry) => (
-                  <g
-                    key={entry.name}
-                    className={`shipment-map-bubble${active === entry.name ? " is-active" : ""}`}
-                    onMouseEnter={() => setActive(entry.name)}
-                    onMouseLeave={() => setActive(null)}
-                    onClick={() => setActive(active === entry.name ? null : entry.name)}
-                  >
-                    <circle cx={entry.x} cy={entry.y} r={Math.max(entry.radius, 12)} className="hit" />
-                    <circle cx={entry.x} cy={entry.y} r={entry.radius} className="mark" />
-                  </g>
-                ))}
-              </g>
-            </svg>
-            {activeBubble ? (
-              <div
-                className="shipment-map-tooltip"
-                style={{
-                  left: `${(activeBubble.x / WIDTH) * 100}%`,
-                  top: `${((activeBubble.y - activeBubble.radius) / HEIGHT) * 100}%`,
-                }}
-                role="status"
-              >
-                <strong>{activeBubble.name}</strong>
-                <span>{formatCurrency(activeBubble.valuation)} donated</span>
-                <span>
-                  {formatNumber(activeBubble.shipments)} shipment{activeBubble.shipments === 1 ? "" : "s"} ·{" "}
-                  {formatNumber(activeBubble.pounds)} lbs
-                </span>
-              </div>
-            ) : null}
+        <div className="shipment-map-list">
+          <div className="donation-chart-header">
+            <h3>Top destinations</h3>
+            <p className="donation-chart-detail">By donated value. Hover a row to find it on the map.</p>
           </div>
-
-          <div className="shipment-map-list">
+          <div className="shipment-map-list-card">
             <div className="shipment-map-list-header" aria-hidden="true">
               <span>Country</span>
               <span>Shipments</span>
@@ -210,18 +230,17 @@ export default function ShipmentMap({ shipments, error: loadError, rangeLabel })
                 </li>
               ))}
             </ol>
-            {partners.length > 0 ? (
-              <p className="shipment-map-note">
-                Also sent abroad through partner organizations, final country not recorded:{" "}
-                {partners.map((entry) => `${entry.name} (${formatCurrency(entry.valuation)})`).join(", ")}.
-              </p>
-            ) : null}
-            <p className="shipment-map-note">
-              US total includes local clinics and Project CURE, which forwards supplies overseas.
-            </p>
           </div>
+          <p className="shipment-map-note">
+            US includes local clinics and Project CURE, which forwards supplies overseas.
+            {partners.length > 0
+              ? ` Not on the map, country not recorded: ${partners
+                  .map((entry) => `${entry.name} (${formatCurrency(entry.valuation)})`)
+                  .join(", ")}.`
+              : ""}
+          </p>
         </div>
       ) : null}
-    </section>
+    </>
   );
 }
