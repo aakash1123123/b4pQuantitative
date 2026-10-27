@@ -305,8 +305,7 @@ export default function DonationHistory({ history, error, sideContent = null }) 
                   {Math.round(Math.abs(yearChange) * 100)}% YoY
                 </span>
                 <span className="donation-yoy-detail">
-                  {latestYear.year}
-                  {latestYear.year === currentYear ? " so far" : ""} vs {priorYear.year}
+                  {latestYear.year} v {priorYear.year}
                 </span>
               </p>
             ) : null}
