@@ -410,7 +410,7 @@ body::before {
   gap: 16px;
 }
 
-/* Year-over-year badge beside the donated total. Arrow and word carry the
+/* Year-over-year badge beside the donated total. The arrow carries the
    direction, so it never relies on color alone. */
 .donation-total-row {
   display: flex;
