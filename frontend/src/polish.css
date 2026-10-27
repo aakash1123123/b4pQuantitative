@@ -71,18 +71,72 @@ body::before {
   position: relative;
 }
 
-.donation-report-button {
+.donation-toolbar {
   position: absolute;
-  top: 22px;
+  top: 18px;
   right: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.donation-report-button {
   padding: 6px 14px;
   font-size: 0.78rem;
 }
 
-@media (max-width: 720px) {
-  .donation-report-button {
-    top: 16px;
-    right: 16px;
+/* Year range for Shipment KPIs: From / To dropdowns. */
+.history-year-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-year-filter label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bp-ink-muted);
+}
+
+.history-year-filter select {
+  min-width: 0;
+  padding: 5px 26px 5px 10px;
+  border: 1px solid var(--bp-line-strong);
+  border-radius: 999px;
+  background-color: var(--bp-surface);
+  color: var(--bp-ink);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.history-year-reset {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--bp-surface-sunken);
+  color: var(--bp-blue);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .donation-toolbar {
+    position: static;
+    justify-content: flex-start;
+    margin-bottom: 14px;
   }
 }
 
@@ -282,7 +336,7 @@ body::before {
   /* The report is the donation history; working panels stay off paper. */
   .top-bar,
   .tabs-section,
-  .donation-report-button,
+  .donation-toolbar,
   .page-shell > .panel:not(.donation-history) {
     display: none !important;
   }
