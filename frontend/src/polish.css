@@ -521,8 +521,13 @@ body::before {
 
 .donation-top-split {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr) minmax(0, 0.85fr);
-  gap: 20px;
+  /* Year chart and map on top; chapters, destination type and the
+     country list below, so they all fit on one screen. */
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-areas:
+    "year year year map map map"
+    "chapter chapter type type list list";
+  gap: 0 24px;
   align-items: stretch;
   margin-top: 4px;
 }
@@ -560,7 +565,7 @@ body::before {
 }
 
 .donation-year .donation-plot {
-  height: 210px;
+  height: 170px;
 }
 
 .donation-year .donation-point-value {
@@ -649,20 +654,26 @@ body::before {
   font-size: 0.72rem;
 }
 
-/* Medium screens: year chart across the top, pie and destination type below. */
-@media (max-width: 1300px) {
+.donation-top-split .donation-year { grid-area: year; }
+.donation-top-split .shipment-map { grid-area: map; }
+.donation-top-split .chapter-breakdown { grid-area: chapter; }
+.donation-top-split .shipment-mix { grid-area: type; }
+.donation-top-split .shipment-map-list { grid-area: list; }
+
+@media (max-width: 1200px) {
   .donation-top-split {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .donation-year {
-    grid-column: 1 / -1;
+    grid-template-areas:
+      "year map"
+      "chapter type"
+      "list list";
   }
 }
 
 @media (max-width: 760px) {
   .donation-top-split {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "year" "map" "chapter" "type" "list";
   }
 
   .donation-top-split .chapter-breakdown-body {
