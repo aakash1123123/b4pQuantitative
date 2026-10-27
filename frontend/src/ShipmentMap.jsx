@@ -49,6 +49,47 @@ function countryFor(shipment) {
   return label === "international" ? null : "United States";
 }
 
+// Nudges overlapping bubbles apart (Syria/Lebanon, the Caribbean) so each
+// one stays visible and hoverable. Bigger bubbles move less. A moved bubble
+// keeps its true location in anchorX/anchorY for a leader line.
+const BUBBLE_GAP = 3;
+
+function separateBubbles(bubbles) {
+  const placed = bubbles.map((entry) => ({ ...entry, anchorX: entry.x, anchorY: entry.y }));
+  for (let pass = 0; pass < 120; pass += 1) {
+    let moved = false;
+    for (let i = 0; i < placed.length; i += 1) {
+      for (let j = i + 1; j < placed.length; j += 1) {
+        const a = placed[i];
+        const b = placed[j];
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let distance = Math.hypot(dx, dy);
+        const needed = a.radius + b.radius + BUBBLE_GAP;
+        if (distance >= needed) {
+          continue;
+        }
+        if (distance < 0.01) {
+          dx = 1;
+          dy = 0;
+          distance = 1;
+        }
+        const overlap = needed - distance;
+        const share = b.radius / (a.radius + b.radius);
+        a.x -= (dx / distance) * overlap * (1 - share);
+        a.y -= (dy / distance) * overlap * (1 - share);
+        b.x += (dx / distance) * overlap * share;
+        b.y += (dy / distance) * overlap * share;
+        moved = true;
+      }
+    }
+    if (!moved) {
+      break;
+    }
+  }
+  return placed;
+}
+
 function formatCurrency(value) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -132,11 +173,13 @@ export default function ShipmentMap({ shipments, error: loadError, rangeLabel })
 
   const reached = new Set(countries.map((entry) => COUNTRIES[entry.name].atlas || entry.name));
   const maxValue = countries[0]?.valuation || 1;
-  const bubbles = countries.map((entry) => {
-    const [x, y] = projection(COUNTRIES[entry.name].coords);
-    const radius = Math.max(MIN_RADIUS, Math.sqrt(entry.valuation / maxValue) * MAX_RADIUS);
-    return { ...entry, x, y, radius };
-  });
+  const bubbles = separateBubbles(
+    countries.map((entry) => {
+      const [x, y] = projection(COUNTRIES[entry.name].coords);
+      const radius = Math.max(MIN_RADIUS, Math.sqrt(entry.valuation / maxValue) * MAX_RADIUS);
+      return { ...entry, x, y, radius };
+    })
+  );
   const activeBubble = bubbles.find((entry) => entry.name === active);
   const loading = !error && (!shipments || !world);
 
@@ -166,7 +209,13 @@ export default function ShipmentMap({ shipments, error: loadError, rangeLabel })
                 onMouseLeave={() => setActive(null)}
                 onClick={() => onBubbleClick(entry.name)}
               >
-                <circle cx={entry.x} cy={entry.y} r={Math.max(entry.radius, 12)} className="hit" />
+                {Math.hypot(entry.x - entry.anchorX, entry.y - entry.anchorY) > 1 ? (
+                  <>
+                    <line x1={entry.anchorX} y1={entry.anchorY} x2={entry.x} y2={entry.y} className="leader" />
+                    <circle cx={entry.anchorX} cy={entry.anchorY} r={1.6} className="anchor" />
+                  </>
+                ) : null}
+                <circle cx={entry.x} cy={entry.y} r={Math.max(entry.radius, 8)} className="hit" />
                 <circle cx={entry.x} cy={entry.y} r={entry.radius} className="mark" />
               </g>
             ))}

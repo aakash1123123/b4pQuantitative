@@ -46,6 +46,16 @@
   fill: transparent;
 }
 
+.shipment-map-bubble .leader {
+  stroke: #0035a2;
+  stroke-width: 1;
+  stroke-opacity: 0.55;
+}
+
+.shipment-map-bubble .anchor {
+  fill: #0035a2;
+}
+
 .shipment-map-bubble .mark {
   fill: #0069f3;
   fill-opacity: 0.72;
