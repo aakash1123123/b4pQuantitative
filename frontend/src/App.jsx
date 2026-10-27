@@ -3382,43 +3382,41 @@ export default function App() {
   );
 
   // Shipment Mix sits beside the chapter breakdown in the donation section.
+  // Each bar carries its own count, value and poundage, so no separate cards.
+  const maxTypeCount = Math.max(...shipmentsByType.map((entry) => entry.count), 1);
   const shipmentMix = (
     <div className="shipment-mix">
       <div className="donation-chart-header">
         <h3>Shipments by destination type</h3>
       </div>
-      <div className="shipment-mix-body">
-        <ShipmentBarChart
-          compact
-          data={shipmentsByType.map((entry) => ({
-            label: entry.type,
-            count: entry.count,
-          }))}
-        />
+      <div className="shipment-mix-body type-bars">
+        {shipmentsByType.map((entry) => (
+          <div className="type-bar-column" key={entry.type}>
+            <div className="type-bar-track">
+              <div
+                className={entry.count / maxTypeCount < 0.25 ? "type-bar is-short" : "type-bar"}
+                style={{ height: `${Math.max((entry.count / maxTypeCount) * 100, 4)}%` }}
+              >
+                <span className="type-bar-count">{formatNumber(entry.count)}</span>
+              </div>
+            </div>
+            <div className="type-bar-label">
+              <strong>{entry.type}</strong>
+              <span>{formatNumber(entry.count)} shipments</span>
+              {donationHistory?.types?.length ? (
+                <span title={`${formatWholeCurrency(entry.valuation)} · ${formatNumber(Math.round(entry.pounds))} lbs`}>
+                  {formatCompactNumber(entry.valuation, "$")} · {formatCompactNumber(entry.pounds)} lbs
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ))}
       </div>
       {donationHistory?.types?.length ? (
-        <>
-          <dl className="shipment-type-stats">
-            {shipmentsByType.map((entry) => (
-              <div key={entry.type}>
-                <dt>{entry.type}</dt>
-                <dd>
-                  <strong>{formatNumber(entry.count)}</strong> shipments
-                </dd>
-                <dd title={formatWholeCurrency(entry.valuation)}>
-                  {formatCompactNumber(entry.valuation, "$")} donated
-                </dd>
-                <dd title={`${formatNumber(Math.round(entry.pounds))} lbs`}>
-                  {formatCompactNumber(entry.pounds)} lbs
-                </dd>
-              </div>
-            ))}
-          </dl>
-          <p className="shipment-type-note">
-            Includes past shipments from the Master Shipment Database. National shipments count as
-            International.
-          </p>
-        </>
+        <p className="shipment-type-note">
+          Includes past shipments from the Master Shipment Database. National shipments count as
+          International.
+        </p>
       ) : null}
     </div>
   );

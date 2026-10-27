@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { geoNaturalEarth1, geoPath } from "d3-geo";
 import { feature } from "topojson-client";
 import "./ShipmentMap.css";
@@ -86,7 +87,17 @@ export default function ShipmentMap({ shipments, error: loadError, rangeLabel })
   const [world, setWorld] = useState(null);
   const [mapError, setMapError] = useState("");
   const [active, setActive] = useState(null);
+  const [expanded, setExpanded] = useState(false);
   const error = loadError || mapError;
+
+  useEffect(() => {
+    if (!expanded) {
+      return undefined;
+    }
+    const closeOnEscape = (event) => event.key === "Escape" && setExpanded(false);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [expanded]);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,118 +140,159 @@ export default function ShipmentMap({ shipments, error: loadError, rangeLabel })
   const activeBubble = bubbles.find((entry) => entry.name === active);
   const loading = !error && (!shipments || !world);
 
-  return (
-    <>
-      <div className="shipment-map" aria-labelledby="shipment-map-title">
-        <div className="donation-chart-header">
-          <h3 id="shipment-map-title">Where our supplies have gone{rangeLabel ? `, ${rangeLabel}` : ""}</h3>
-          <p className="donation-chart-detail">
-            Bubble size is donated value per country. Hover a bubble for details.
-          </p>
-        </div>
+  const title = `Where our supplies have gone${rangeLabel ? `, ${rangeLabel}` : ""}`;
 
-        {error ? <p className="shipment-map-message">{error}</p> : null}
-        {loading ? <div className="shipment-map-skeleton" aria-busy="true" /> : null}
-
-        {!loading && !error ? (
-          <div className="shipment-map-canvas">
-            <div
-              className="shipment-map-stage"
-              style={{ maxWidth: `${(MAX_DISPLAY_HEIGHT * WIDTH) / height}px` }}
-            >
-              <svg
-                viewBox={`0 0 ${WIDTH} ${height}`}
-                role="img"
-                aria-label="World map of donated value by destination country"
+  // The map drawing, shared by the card and the expanded view.
+  function renderMap(maxHeight, onBubbleClick) {
+    return (
+      <div className="shipment-map-stage" style={{ maxWidth: `${(maxHeight * WIDTH) / height}px` }}>
+        <svg viewBox={`0 0 ${WIDTH} ${height}`} role="img" aria-label="World map of donated value by destination country">
+          <g>
+            {world.map((country) => (
+              <path
+                key={country.id ?? country.properties.name}
+                d={path(country)}
+                className={reached.has(country.properties.name) ? "is-reached" : undefined}
+              />
+            ))}
+          </g>
+          {/* Largest first so small bubbles stay on top and hoverable. */}
+          <g>
+            {bubbles.map((entry) => (
+              <g
+                key={entry.name}
+                className={`shipment-map-bubble${active === entry.name ? " is-active" : ""}`}
+                onMouseEnter={() => setActive(entry.name)}
+                onMouseLeave={() => setActive(null)}
+                onClick={() => onBubbleClick(entry.name)}
               >
-                <g>
-                  {world.map((country) => (
-                    <path
-                      key={country.id ?? country.properties.name}
-                      d={path(country)}
-                      className={reached.has(country.properties.name) ? "is-reached" : undefined}
-                    />
-                  ))}
-                </g>
-                {/* Largest first so small bubbles stay on top and hoverable. */}
-                <g>
-                  {bubbles.map((entry) => (
-                    <g
-                      key={entry.name}
-                      className={`shipment-map-bubble${active === entry.name ? " is-active" : ""}`}
-                      onMouseEnter={() => setActive(entry.name)}
-                      onMouseLeave={() => setActive(null)}
-                      onClick={() => setActive(active === entry.name ? null : entry.name)}
-                    >
-                      <circle cx={entry.x} cy={entry.y} r={Math.max(entry.radius, 12)} className="hit" />
-                      <circle cx={entry.x} cy={entry.y} r={entry.radius} className="mark" />
-                    </g>
-                  ))}
-                </g>
-              </svg>
-              {activeBubble ? (
-                <div
-                  className="shipment-map-tooltip"
-                  style={{
-                    left: `${(activeBubble.x / WIDTH) * 100}%`,
-                    top: `${((activeBubble.y - activeBubble.radius) / height) * 100}%`,
-                  }}
-                  role="status"
-                >
-                  <strong>{activeBubble.name}</strong>
-                  <span>{formatCurrency(activeBubble.valuation)} donated</span>
-                  <span>
-                    {formatNumber(activeBubble.shipments)} shipment{activeBubble.shipments === 1 ? "" : "s"} ·{" "}
-                    {formatNumber(activeBubble.pounds)} lbs
-                  </span>
-                </div>
-              ) : null}
-            </div>
+                <circle cx={entry.x} cy={entry.y} r={Math.max(entry.radius, 12)} className="hit" />
+                <circle cx={entry.x} cy={entry.y} r={entry.radius} className="mark" />
+              </g>
+            ))}
+          </g>
+        </svg>
+        {activeBubble ? (
+          <div
+            className="shipment-map-tooltip"
+            style={{
+              left: `${(activeBubble.x / WIDTH) * 100}%`,
+              top: `${((activeBubble.y - activeBubble.radius) / height) * 100}%`,
+            }}
+            role="status"
+          >
+            <strong>{activeBubble.name}</strong>
+            <span>{formatCurrency(activeBubble.valuation)} donated</span>
+            <span>
+              {formatNumber(activeBubble.shipments)} shipment{activeBubble.shipments === 1 ? "" : "s"} ·{" "}
+              {formatNumber(activeBubble.pounds)} lbs
+            </span>
           </div>
         ) : null}
       </div>
+    );
+  }
+
+  return (
+    <div className="shipment-map" aria-labelledby="shipment-map-title">
+      <div className="donation-chart-header">
+        <h3 id="shipment-map-title">{title}</h3>
+        <p className="donation-chart-detail">
+          Bubble size is donated value. Click the map for every country.
+        </p>
+      </div>
+
+      {error ? <p className="shipment-map-message">{error}</p> : null}
+      {loading ? <div className="shipment-map-skeleton" aria-busy="true" /> : null}
 
       {!loading && !error ? (
-        <div className="shipment-map-list">
-          <div className="donation-chart-header">
-            <h3>Top destinations</h3>
-            <p className="donation-chart-detail">By donated value. Hover a row to find it on the map.</p>
-          </div>
-          <div className="shipment-map-list-card">
-            <div className="shipment-map-list-header" aria-hidden="true">
-              <span>Country</span>
-              <span>Shipments</span>
-              <span>Value</span>
-            </div>
-            <ol>
-              {countries.map((entry) => (
-                <li key={entry.name}>
-                  <button
-                    type="button"
-                    className={active === entry.name ? "is-active" : undefined}
-                    onMouseEnter={() => setActive(entry.name)}
-                    onMouseLeave={() => setActive(null)}
-                    onFocus={() => setActive(entry.name)}
-                    onBlur={() => setActive(null)}
-                  >
-                    <span className="name">{entry.name}</span>
-                    <span className="count">{formatNumber(entry.shipments)}</span>
-                    <span className="value">{formatCurrency(entry.valuation)}</span>
-                  </button>
-                </li>
-              ))}
-            </ol>
-          </div>
-          <p className="shipment-map-note">
-            US includes local clinics and Project CURE, which forwards supplies overseas.
-            {partners.length > 0
-              ? ` Not on the map, country not recorded: ${partners
-                  .map((entry) => `${entry.name} (${formatCurrency(entry.valuation)})`)
-                  .join(", ")}.`
-              : ""}
-          </p>
+        <div
+          className="shipment-map-canvas is-clickable"
+          role="button"
+          tabIndex={0}
+          aria-label="Open the map with every destination country"
+          onClick={() => setExpanded(true)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setExpanded(true);
+            }
+          }}
+        >
+          {renderMap(MAX_DISPLAY_HEIGHT, () => setExpanded(true))}
+          <span className="shipment-map-expand" aria-hidden="true">⤢ Expand</span>
         </div>
       ) : null}
-    </>
+
+      {/* Portaled to <body>: the glass panel's backdrop-filter would otherwise
+          trap the fixed overlay inside the panel. */}
+      {expanded && !loading && !error ? createPortal(
+        <div className="modal-backdrop" role="presentation" onClick={() => setExpanded(false)}>
+          <div
+            className="shipment-map-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shipment-map-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-map-modal-header">
+              <div>
+                <h2 id="shipment-map-modal-title">{title}</h2>
+                <p className="donation-chart-detail">
+                  Bubble size is donated value. Hover a bubble or a row for details.
+                </p>
+              </div>
+              <button type="button" className="modal-close" onClick={() => setExpanded(false)}>
+                x
+              </button>
+            </div>
+
+            <div className="shipment-map-modal-body">
+              <div className="shipment-map-canvas">
+                {renderMap(520, (name) => setActive(active === name ? null : name))}
+              </div>
+
+              <div className="shipment-map-list">
+                <div className="shipment-map-list-card">
+                  <div className="shipment-map-list-header" aria-hidden="true">
+                    <span>Country</span>
+                    <span>Shipments</span>
+                    <span>Value</span>
+                  </div>
+                  <ol>
+                    {countries.map((entry) => (
+                      <li key={entry.name}>
+                        <button
+                          type="button"
+                          className={active === entry.name ? "is-active" : undefined}
+                          onMouseEnter={() => setActive(entry.name)}
+                          onMouseLeave={() => setActive(null)}
+                          onFocus={() => setActive(entry.name)}
+                          onBlur={() => setActive(null)}
+                        >
+                          <span className="name">{entry.name}</span>
+                          <span className="count">{formatNumber(entry.shipments)}</span>
+                          <span className="value">{formatCurrency(entry.valuation)}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+                <p className="shipment-map-note">
+                  US includes local clinics and Project CURE, which forwards supplies overseas.
+                  {partners.length > 0
+                    ? ` Not on the map, country not recorded: ${partners
+                        .map((entry) => `${entry.name} (${formatCurrency(entry.valuation)})`)
+                        .join(", ")}.`
+                    : ""}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        ,
+        document.body
+      ) : null}
+    </div>
   );
 }

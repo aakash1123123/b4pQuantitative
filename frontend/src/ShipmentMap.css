@@ -93,8 +93,6 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  max-height: 196px;
-  overflow-y: auto;
 }
 
 .shipment-map-list-header,
@@ -172,4 +170,70 @@
   margin-top: 12px;
   border-radius: 18px;
   background: var(--bp-surface-sunken);
+}
+
+.shipment-map-canvas.is-clickable {
+  position: relative;
+  cursor: zoom-in;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.shipment-map-canvas.is-clickable:hover,
+.shipment-map-canvas.is-clickable:focus-visible {
+  border-color: var(--bp-blue-bright);
+  box-shadow: 0 0 0 3px rgba(0, 105, 243, 0.12);
+  outline: none;
+}
+
+.shipment-map-expand {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--bp-surface-sunken);
+  color: var(--bp-blue);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.shipment-map-modal {
+  width: min(1240px, 100%);
+  max-height: calc(100dvh - 40px);
+  padding: 22px 24px;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(0, 14, 63, 0.18);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.shipment-map-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.shipment-map-modal-header h2 {
+  margin: 0 0 2px;
+  font-family: var(--bp-display);
+  color: var(--bp-heading);
+}
+
+.shipment-map-modal-body {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(260px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.shipment-map-modal-body .shipment-map-list-card {
+  margin-top: 12px;
+}
+
+@media (max-width: 860px) {
+  .shipment-map-modal-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
