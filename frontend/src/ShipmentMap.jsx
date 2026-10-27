@@ -7,12 +7,10 @@ import "./ShipmentMap.css";
 const WIDTH = 960;
 // The map is drawn at most this tall on screen, so it fits beside the year chart.
 const MAX_DISPLAY_HEIGHT = 250;
-const MAX_RADIUS = 30;
-const MIN_RADIUS = 4.5;
 
 // The sheet's "Shipping Destination" is free text: a country, a city, a
 // clinic or a partner organization. Countries are matched by name; [lon, lat]
-// is where the bubble sits, and atlas is the country's name in world-atlas.
+// is where its tooltip points, and atlas is the country's name in world-atlas.
 const COUNTRIES = {
   "United States": { atlas: "United States of America", coords: [-88, 39.5] },
   Ghana: { coords: [-1.0, 7.9] },
@@ -49,45 +47,19 @@ function countryFor(shipment) {
   return label === "international" ? null : "United States";
 }
 
-// Nudges overlapping bubbles apart (Syria/Lebanon, the Caribbean) so each
-// one stays visible and hoverable. Bigger bubbles move less. A moved bubble
-// keeps its true location in anchorX/anchorY for a leader line.
-const BUBBLE_GAP = 3;
+// Value bands for shading destination countries, light to dark brand blue.
+// The US is far larger than everywhere else, so the bands step roughly by
+// order of magnitude rather than evenly.
+const VALUE_BANDS = [
+  { min: 0, label: "Under $10K", color: "#b9cff8" },
+  { min: 10000, label: "$10K–$100K", color: "#86adf3" },
+  { min: 100000, label: "$100K–$500K", color: "#4a87ee" },
+  { min: 500000, label: "$500K–$1M", color: "#1663dc" },
+  { min: 1000000, label: "$1M+", color: "#0035a2" },
+];
 
-function separateBubbles(bubbles) {
-  const placed = bubbles.map((entry) => ({ ...entry, anchorX: entry.x, anchorY: entry.y }));
-  for (let pass = 0; pass < 120; pass += 1) {
-    let moved = false;
-    for (let i = 0; i < placed.length; i += 1) {
-      for (let j = i + 1; j < placed.length; j += 1) {
-        const a = placed[i];
-        const b = placed[j];
-        let dx = b.x - a.x;
-        let dy = b.y - a.y;
-        let distance = Math.hypot(dx, dy);
-        const needed = a.radius + b.radius + BUBBLE_GAP;
-        if (distance >= needed) {
-          continue;
-        }
-        if (distance < 0.01) {
-          dx = 1;
-          dy = 0;
-          distance = 1;
-        }
-        const overlap = needed - distance;
-        const share = b.radius / (a.radius + b.radius);
-        a.x -= (dx / distance) * overlap * (1 - share);
-        a.y -= (dy / distance) * overlap * (1 - share);
-        b.x += (dx / distance) * overlap * share;
-        b.y += (dy / distance) * overlap * share;
-        moved = true;
-      }
-    }
-    if (!moved) {
-      break;
-    }
-  }
-  return placed;
+function bandFor(value) {
+  return [...VALUE_BANDS].reverse().find((band) => value >= band.min);
 }
 
 function formatCurrency(value) {
@@ -171,70 +143,57 @@ export default function ShipmentMap({ shipments, error: loadError, rangeLabel })
   }, [world]);
   const path = useMemo(() => geoPath(projection), [projection]);
 
-  const reached = new Set(countries.map((entry) => COUNTRIES[entry.name].atlas || entry.name));
-  const maxValue = countries[0]?.valuation || 1;
-  const bubbles = separateBubbles(
+  // Destination totals keyed by the country's world-atlas name.
+  const byAtlasName = new Map(
     countries.map((entry) => {
       const [x, y] = projection(COUNTRIES[entry.name].coords);
-      const radius = Math.max(MIN_RADIUS, Math.sqrt(entry.valuation / maxValue) * MAX_RADIUS);
-      return { ...entry, x, y, radius };
+      return [COUNTRIES[entry.name].atlas || entry.name, { ...entry, x, y }];
     })
   );
-  const activeBubble = bubbles.find((entry) => entry.name === active);
+  const activeCountry = countries.length
+    ? [...byAtlasName.values()].find((entry) => entry.name === active)
+    : null;
   const loading = !error && (!shipments || !world);
 
   const title = `Where our supplies have gone${rangeLabel ? `, ${rangeLabel}` : ""}`;
 
   // The map drawing, shared by the card and the expanded view.
-  function renderMap(maxHeight, onBubbleClick) {
+  function renderMap(maxHeight, onCountryClick) {
     return (
       <div className="shipment-map-stage" style={{ maxWidth: `${(maxHeight * WIDTH) / height}px` }}>
-        <svg viewBox={`0 0 ${WIDTH} ${height}`} role="img" aria-label="World map of donated value by destination country">
-          <g>
-            {world.map((country) => (
+        <svg viewBox={`0 0 ${WIDTH} ${height}`} role="img" aria-label="World map shaded by donated value per destination country">
+          {world.map((country) => {
+            const destination = byAtlasName.get(country.properties.name);
+            if (!destination) {
+              return <path key={country.id ?? country.properties.name} d={path(country)} />;
+            }
+            return (
               <path
                 key={country.id ?? country.properties.name}
                 d={path(country)}
-                className={reached.has(country.properties.name) ? "is-reached" : undefined}
-              />
-            ))}
-          </g>
-          {/* Largest first so small bubbles stay on top and hoverable. */}
-          <g>
-            {bubbles.map((entry) => (
-              <g
-                key={entry.name}
-                className={`shipment-map-bubble${active === entry.name ? " is-active" : ""}`}
-                onMouseEnter={() => setActive(entry.name)}
+                className={`is-reached${active === destination.name ? " is-active" : ""}`}
+                style={{ fill: bandFor(destination.valuation).color }}
+                onMouseEnter={() => setActive(destination.name)}
                 onMouseLeave={() => setActive(null)}
-                onClick={() => onBubbleClick(entry.name)}
-              >
-                {Math.hypot(entry.x - entry.anchorX, entry.y - entry.anchorY) > 1 ? (
-                  <>
-                    <line x1={entry.anchorX} y1={entry.anchorY} x2={entry.x} y2={entry.y} className="leader" />
-                    <circle cx={entry.anchorX} cy={entry.anchorY} r={1.6} className="anchor" />
-                  </>
-                ) : null}
-                <circle cx={entry.x} cy={entry.y} r={Math.max(entry.radius, 8)} className="hit" />
-                <circle cx={entry.x} cy={entry.y} r={entry.radius} className="mark" />
-              </g>
-            ))}
-          </g>
+                onClick={() => onCountryClick(destination.name)}
+              />
+            );
+          })}
         </svg>
-        {activeBubble ? (
+        {activeCountry ? (
           <div
             className="shipment-map-tooltip"
             style={{
-              left: `${(activeBubble.x / WIDTH) * 100}%`,
-              top: `${((activeBubble.y - activeBubble.radius) / height) * 100}%`,
+              left: `${(activeCountry.x / WIDTH) * 100}%`,
+              top: `${(activeCountry.y / height) * 100}%`,
             }}
             role="status"
           >
-            <strong>{activeBubble.name}</strong>
-            <span>{formatCurrency(activeBubble.valuation)} donated</span>
+            <strong>{activeCountry.name}</strong>
+            <span>{formatCurrency(activeCountry.valuation)} donated</span>
             <span>
-              {formatNumber(activeBubble.shipments)} shipment{activeBubble.shipments === 1 ? "" : "s"} ·{" "}
-              {formatNumber(activeBubble.pounds)} lbs
+              {formatNumber(activeCountry.shipments)} shipment{activeCountry.shipments === 1 ? "" : "s"} ·{" "}
+              {formatNumber(activeCountry.pounds)} lbs
             </span>
           </div>
         ) : null}
@@ -242,12 +201,23 @@ export default function ShipmentMap({ shipments, error: loadError, rangeLabel })
     );
   }
 
+  const legend = (
+    <ul className="shipment-map-legend" aria-label="Donated value bands">
+      {VALUE_BANDS.map((band) => (
+        <li key={band.label}>
+          <span className="swatch" style={{ background: band.color }} aria-hidden="true" />
+          {band.label}
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
     <div className="shipment-map" aria-labelledby="shipment-map-title">
       <div className="donation-chart-header">
         <h3 id="shipment-map-title">{title}</h3>
         <p className="donation-chart-detail">
-          Bubble size is donated value. Click the map for every country.
+          Darker countries received more. Click the map for every country.
         </p>
       </div>
 
@@ -269,6 +239,7 @@ export default function ShipmentMap({ shipments, error: loadError, rangeLabel })
           }}
         >
           {renderMap(MAX_DISPLAY_HEIGHT, () => setExpanded(true))}
+          {legend}
           <span className="shipment-map-expand" aria-hidden="true">⤢ Expand</span>
         </div>
       ) : null}
@@ -288,7 +259,7 @@ export default function ShipmentMap({ shipments, error: loadError, rangeLabel })
               <div>
                 <h2 id="shipment-map-modal-title">{title}</h2>
                 <p className="donation-chart-detail">
-                  Bubble size is donated value. Hover a bubble or a row for details.
+                  Darker countries received more. Hover a country or a row for details.
                 </p>
               </div>
               <button type="button" className="modal-close" onClick={() => setExpanded(false)}>
@@ -299,6 +270,7 @@ export default function ShipmentMap({ shipments, error: loadError, rangeLabel })
             <div className="shipment-map-modal-body">
               <div className="shipment-map-canvas">
                 {renderMap(520, (name) => setActive(active === name ? null : name))}
+                {legend}
               </div>
 
               <div className="shipment-map-list">
