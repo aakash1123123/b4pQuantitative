@@ -329,14 +329,11 @@ body::before {
     animation: none !important;
   }
 
-  .donation-top-split,
-  .donation-mix-row .shipment-mix {
+  .donation-top-split {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .donation-year,
-  .donation-top-split .chapter-breakdown,
-  .donation-mix-row {
+  .donation-top-split > * {
     break-inside: avoid;
   }
 }
@@ -401,77 +398,176 @@ body::before {
 }
 
 /* ============================================================
-   Shipment KPIs layout: value-by-year chart with the chapter pie
-   beside it, then Shipment Mix across the full width.
+   Shipment KPIs layout: a compact headline, then the year chart,
+   chapter pie and destination type side by side, so all three fit
+   on the first screen.
    ============================================================ */
+.donation-total {
+  font-size: clamp(2.2rem, 4.4vw, 3.4rem);
+}
+
+.donation-hero {
+  gap: 16px;
+}
+
+.donation-stats div {
+  padding: 10px 14px;
+}
+
+.donation-stats dd {
+  font-size: 1.2rem;
+}
+
 .donation-top-split {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-  gap: 24px;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr) minmax(0, 0.85fr);
+  gap: 20px;
   align-items: stretch;
+  margin-top: 4px;
 }
 
-.donation-year,
-.donation-top-split .chapter-breakdown {
+.donation-top-split > * {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
-.donation-year .donation-chart,
+.donation-top-split .donation-chart-header {
+  margin-top: 20px;
+}
+
+/* Hover hints take a line of their own under the heading. */
+.donation-top-split .donation-chart-header {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.donation-top-split .donation-chart-detail {
+  font-size: 0.78rem;
+}
+
+.donation-top-split .donation-chart,
+.donation-top-split .chapter-breakdown-body,
+.donation-top-split .shipment-mix-body {
+  margin-top: 12px;
+}
+
+.donation-year .donation-chart {
+  flex: 1;
+  padding: 18px 14px 8px;
+}
+
+.donation-year .donation-plot {
+  height: 210px;
+}
+
+.donation-year .donation-point-value {
+  padding: 1px 4px;
+  font-size: 0.64rem;
+}
+
 .donation-top-split .chapter-breakdown-body {
   flex: 1;
+  grid-template-columns: minmax(96px, 120px) minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px 12px;
 }
 
-.donation-top-split .chapter-breakdown-body {
-  grid-template-columns: minmax(120px, 170px) minmax(0, 1fr);
-  gap: 18px;
+.donation-top-split .chapter-donut-center strong {
+  font-size: 1.4rem;
+}
+
+.donation-top-split .chapter-legend {
+  gap: 0;
 }
 
 .donation-top-split .chapter-legend button {
+  grid-template-columns: 10px minmax(0, 1fr) auto 40px;
   gap: 8px;
-  padding: 7px 8px;
+  padding: 5px 6px;
+  font-size: 0.88rem;
 }
 
-.donation-mix-row {
-  margin-top: 28px;
+.donation-top-split .shipment-mix-body {
+  padding: 14px 12px 6px;
 }
 
-/* Bar chart on the left, the Local / International tiles on the right. */
-.donation-mix-row .shipment-mix {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-  column-gap: 24px;
-  align-items: start;
+/* Compact bar chart for the destination-type card. */
+.shipment-bar-chart-compact .shipment-bar-chart-y-axis {
+  height: 130px;
+  margin-bottom: 40px;
+  font-size: 0.74rem;
 }
 
-.donation-mix-row .shipment-mix > .donation-chart-header,
-.donation-mix-row .shipment-mix > .shipment-type-note {
-  grid-column: 1 / -1;
+.shipment-bar-chart-compact .shipment-bar-chart-plot,
+.shipment-bar-chart-compact .shipment-bar-chart-bars {
+  height: 170px;
 }
 
-.donation-mix-row .shipment-mix > .donation-chart-header {
-  margin-top: 0;
+.shipment-bar-chart-compact .shipment-bar-chart-grid {
+  inset: 0 0 40px 0;
 }
 
-.donation-mix-row .shipment-type-stats {
-  grid-template-columns: minmax(0, 1fr);
-  margin-top: 16px;
+.shipment-bar-chart-compact .shipment-bar-chart-column {
+  grid-template-rows: 130px minmax(1.6em, auto);
+  gap: 8px;
 }
 
-@media (max-width: 1100px) {
-  .donation-top-split,
-  .donation-mix-row .shipment-mix {
+.shipment-bar-chart-compact .shipment-bar-chart-bar-wrap {
+  height: 130px;
+  max-width: 56px;
+}
+
+.shipment-bar-chart-compact .shipment-bar-chart-label {
+  font-size: 0.8rem;
+}
+
+.donation-top-split .shipment-type-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.donation-top-split .shipment-type-stats > div {
+  padding: 8px 10px;
+}
+
+.donation-top-split .shipment-type-stats dd {
+  font-size: 0.78rem;
+}
+
+.donation-top-split .shipment-type-stats dd strong {
+  font-size: 1.1rem;
+}
+
+.donation-top-split .shipment-type-note {
+  font-size: 0.72rem;
+}
+
+/* Medium screens: year chart across the top, pie and destination type below. */
+@media (max-width: 1300px) {
+  .donation-top-split {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .donation-year {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .donation-top-split {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .donation-mix-row .shipment-type-stats {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  }
-}
-
-@media (max-width: 720px) {
   .donation-top-split .chapter-breakdown-body {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .donation-top-split .chapter-donut {
+    width: min(200px, 100%);
+    margin: 0 auto;
   }
 }
 
