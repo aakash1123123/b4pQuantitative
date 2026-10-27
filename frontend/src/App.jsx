@@ -1390,6 +1390,7 @@ export default function App() {
   const [detailsItem, setDetailsItem] = useState(null);
   const [returningShipmentItem, setReturningShipmentItem] = useState(null);
   const [returningShipmentItems, setReturningShipmentItems] = useState(null);
+  const [deletingShipment, setDeletingShipment] = useState(null);
   const [requestingShipmentItem, setRequestingShipmentItem] = useState(null);
   const [consolidatingShipmentItem, setConsolidatingShipmentItem] = useState(null);
   const [bulkConsolidationCheck, setBulkConsolidationCheck] = useState(null);
@@ -1505,7 +1506,7 @@ export default function App() {
       const storedShipments = window.localStorage.getItem(SHIPMENT_STORAGE_KEY);
       if (storedShipments) {
         const parsedShipments = JSON.parse(storedShipments);
-        const normalizedShipments = (parsedShipments.length > 0 ? parsedShipments : defaultShipments)
+        const normalizedShipments = (Array.isArray(parsedShipments) ? parsedShipments : defaultShipments)
           .map((shipment) =>
             withConsolidationCompletionDate({
               ...shipment,
@@ -2195,6 +2196,34 @@ export default function App() {
 
   function closeReturnAllToInventoryModal() {
     setReturningShipmentItems(null);
+  }
+
+  function openDeleteShipmentModal(shipment) {
+    setDeletingShipment({
+      shipmentId: shipment.id,
+      shipmentName: shipment.recipientName,
+      itemCount: shipment.items.length,
+    });
+  }
+
+  function closeDeleteShipmentModal() {
+    setDeletingShipment(null);
+  }
+
+  // Deleting a shipment drops it entirely; its supplies stop counting as
+  // pulled, so they show as available in Total Inventory again.
+  function deleteShipment() {
+    if (!deletingShipment) {
+      return;
+    }
+
+    setShipments((currentShipments) =>
+      currentShipments.filter((shipment) => shipment.id !== deletingShipment.shipmentId)
+    );
+    setExpandedShipmentIds((currentIds) =>
+      currentIds.filter((shipmentId) => shipmentId !== deletingShipment.shipmentId)
+    );
+    closeDeleteShipmentModal();
   }
 
   function openRequestedUnitsModal(shipmentId, shipmentItem) {
@@ -4359,6 +4388,13 @@ export default function App() {
                           </button>
                           <button
                             type="button"
+                            className="secondary-button danger-button"
+                            onClick={() => openDeleteShipmentModal(shipment)}
+                          >
+                            Delete Shipment
+                          </button>
+                          <button
+                            type="button"
                             className="primary-button"
                             onClick={() => openShippingModal(shipment.id)}
                             disabled={
@@ -5813,6 +5849,47 @@ export default function App() {
                 onClick={returnShipmentItemToInventory}
               >
                 Confirm Return
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deletingShipment ? (
+        <div className="modal-backdrop" role="presentation" onClick={closeDeleteShipmentModal}>
+          <div
+            className="shipment-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-shipment-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shipment-modal-header">
+              <div>
+                <h2 id="delete-shipment-modal-title">Delete this shipment?</h2>
+              </div>
+              <button type="button" className="modal-close" onClick={closeDeleteShipmentModal}>
+                x
+              </button>
+            </div>
+
+            <div className="shipment-modal-body">
+              <p className="modal-item-name">
+                Delete <strong>{deletingShipment.shipmentName}</strong>?
+              </p>
+              <p className="shipment-empty">
+                {deletingShipment.itemCount > 0
+                  ? `Its ${formatNumber(deletingShipment.itemCount)} supplies go back to available in Total Inventory. This can't be undone.`
+                  : "The shipment has no supplies. This can't be undone."}
+              </p>
+            </div>
+
+            <div className="shipment-modal-actions">
+              <button type="button" className="secondary-button" onClick={closeDeleteShipmentModal}>
+                Cancel
+              </button>
+              <button type="button" className="primary-button danger-button" onClick={deleteShipment}>
+                Delete Shipment
               </button>
             </div>
           </div>
