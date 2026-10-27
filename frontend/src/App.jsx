@@ -1283,16 +1283,16 @@ function shipmentChartAxisMax(values) {
   return Math.max(5, Math.ceil(highestValue / 5) * 5);
 }
 
-function ShipmentBarChart({ data, variant = "primary" }) {
+function ShipmentBarChart({ data, variant = "primary", compact = false }) {
   const axisMax = shipmentChartAxisMax(data.map((entry) => entry.count));
   const ticks = Array.from({ length: 6 }, (_, index) => {
     const value = Math.round(((5 - index) / 5) * axisMax);
     return value;
   });
-  const plotHeight = 220;
+  const plotHeight = compact ? 130 : 220;
 
   return (
-    <div className="shipment-bar-chart">
+    <div className={compact ? "shipment-bar-chart shipment-bar-chart-compact" : "shipment-bar-chart"}>
       <div className="shipment-bar-chart-y-axis">
         {ticks.map((tickValue) => (
           <span key={tickValue}>{formatNumber(tickValue)}</span>
@@ -3261,10 +3261,13 @@ export default function App() {
         <h3>Shipments by destination type</h3>
       </div>
       <div className="shipment-mix-body">
-        <ShipmentBarChart data={shipmentsByType.map((entry) => ({
-          label: entry.type,
-          count: entry.count,
-        }))} />
+        <ShipmentBarChart
+          compact
+          data={shipmentsByType.map((entry) => ({
+            label: entry.type,
+            count: entry.count,
+          }))}
+        />
       </div>
       {donationHistory?.types?.length ? (
         <>
