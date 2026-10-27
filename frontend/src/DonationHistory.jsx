@@ -244,7 +244,17 @@ function ChapterBreakdown({ chapters, visible }) {
   );
 }
 
-export default function DonationHistory({ history, error, sideContent = null }) {
+// history may already be narrowed to a range of years (rangeLabel says which);
+// allYears is the full by-year list, so year-over-year still has a prior year.
+export default function DonationHistory({
+  history,
+  allYears = null,
+  error,
+  sideContent = null,
+  mapContent = null,
+  yearFilter = null,
+  rangeLabel = "",
+}) {
   const [activeYear, setActiveYear] = useState(null);
   const sectionRef = useRef(null);
   const seen = useSeenOnce(sectionRef);
@@ -259,9 +269,9 @@ export default function DonationHistory({ history, error, sideContent = null }) 
   const maxValuation = Math.max(...years.map((entry) => entry.valuation), 1);
   const currentYear = new Date().getFullYear();
   const firstYear = years[0]?.year;
-  // Year-over-year change: the latest year in the data against the one before it.
+  // Year-over-year change: the last year shown against the one before it.
   const latestYear = years[years.length - 1];
-  const priorYear = years.find((entry) => entry.year === latestYear?.year - 1);
+  const priorYear = (allYears ?? years).find((entry) => entry.year === latestYear?.year - 1);
   const yearChange =
     latestYear && priorYear?.valuation > 0
       ? (latestYear.valuation - priorYear.valuation) / priorYear.valuation
@@ -283,14 +293,17 @@ export default function DonationHistory({ history, error, sideContent = null }) 
     <section className="panel donation-history" ref={sectionRef}>
       <div className="donation-hero">
         <div>
-          <p className="section-label">Donated to date</p>
-          <button
-            type="button"
-            className="secondary-button donation-report-button"
-            onClick={() => window.print()}
-          >
-            Download report
-          </button>
+          <p className="section-label">{rangeLabel ? `Donated ${rangeLabel}` : "Donated to date"}</p>
+          <div className="donation-toolbar">
+            {yearFilter}
+            <button
+              type="button"
+              className="secondary-button donation-report-button"
+              onClick={() => window.print()}
+            >
+              Download report
+            </button>
+          </div>
           <div className="donation-total-row">
             <p className="donation-total" aria-live="polite">
               {history ? formatCurrencyWhole(animatedTotal) : "—"}
@@ -313,8 +326,9 @@ export default function DonationHistory({ history, error, sideContent = null }) 
             ) : null}
           </div>
           <p className="donation-subtitle">
-            Estimated value of the medical supplies Blueprints has shipped
-            {firstYear ? ` since ${firstYear}` : ""}.
+            {rangeLabel
+              ? `Estimated value of the medical supplies Blueprints shipped in ${rangeLabel}.`
+              : `Estimated value of the medical supplies Blueprints has shipped${firstYear ? ` since ${firstYear}` : ""}.`}
           </p>
         </div>
         <dl className="donation-stats">
@@ -329,7 +343,7 @@ export default function DonationHistory({ history, error, sideContent = null }) 
             <dd>{history ? history.total_shipments : "—"}</dd>
           </div>
           <div>
-            <dt>Years active</dt>
+            <dt>{rangeLabel ? "Years shown" : "Years active"}</dt>
             <dd>{years.length || "—"}</dd>
           </div>
         </dl>
@@ -418,6 +432,7 @@ export default function DonationHistory({ history, error, sideContent = null }) 
           </div>
 
         </div>
+        {mapContent}
         {history?.chapters?.length ? (
           <ChapterBreakdown chapters={history.chapters} visible={seen && Boolean(history)} />
         ) : null}

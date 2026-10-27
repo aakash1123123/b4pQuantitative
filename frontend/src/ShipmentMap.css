@@ -1,0 +1,253 @@
+.shipment-map,
+.shipment-map-list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.shipment-map-canvas {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 18px;
+  background: var(--bp-surface);
+  border: 1px solid var(--bp-line);
+}
+
+.shipment-map-stage {
+  position: relative;
+  width: 100%;
+}
+
+.shipment-map-stage svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.shipment-map-stage path {
+  fill: #e6ebf4;
+  stroke: #ffffff;
+  stroke-width: 0.6;
+}
+
+
+.shipment-map-stage path.is-reached {
+  cursor: pointer;
+  stroke: #ffffff;
+  stroke-width: 0.8;
+  transition: filter 0.15s ease;
+}
+
+.shipment-map-stage path.is-reached.is-active {
+  stroke: #000e3f;
+  stroke-width: 1.4;
+  filter: brightness(0.85);
+}
+
+.shipment-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.72rem;
+  color: var(--bp-ink-muted);
+}
+
+.shipment-map-legend li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.shipment-map-legend .swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.shipment-map-tooltip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--bp-heading, #000e3f);
+  color: #ffffff;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 12px));
+  box-shadow: 0 8px 24px rgba(0, 14, 63, 0.2);
+}
+
+.shipment-map-tooltip strong {
+  font-family: var(--bp-display);
+  font-size: 0.92rem;
+}
+
+.shipment-map-list-card {
+  flex: 1;
+  margin-top: 12px;
+  padding: 10px 8px;
+  border-radius: 18px;
+  background: var(--bp-surface);
+  border: 1px solid var(--bp-line);
+}
+
+.shipment-map-list ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shipment-map-list-header,
+.shipment-map-list button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 70px 72px;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.shipment-map-list-header {
+  padding: 0 8px 6px;
+  border-bottom: 1px solid var(--bp-line);
+  margin-bottom: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bp-ink-faint);
+}
+
+.shipment-map-list-header span:not(:first-child) {
+  text-align: right;
+}
+
+.shipment-map-list button {
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--bp-ink);
+  font: inherit;
+  font-size: 0.86rem;
+  text-align: left;
+  cursor: default;
+}
+
+.shipment-map-list button.is-active {
+  background: var(--bp-surface-sunken);
+}
+
+.shipment-map-list .name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shipment-map-list .count {
+  color: var(--bp-ink-muted);
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.shipment-map-list .value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.shipment-map-note {
+  margin: 8px 4px 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--bp-ink-muted);
+}
+
+.shipment-map-message {
+  color: var(--bp-ink-muted);
+}
+
+.shipment-map-skeleton {
+  flex: 1;
+  min-height: 250px;
+  margin-top: 12px;
+  border-radius: 18px;
+  background: var(--bp-surface-sunken);
+}
+
+.shipment-map-canvas.is-clickable {
+  position: relative;
+  cursor: zoom-in;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.shipment-map-canvas.is-clickable:hover,
+.shipment-map-canvas.is-clickable:focus-visible {
+  border-color: var(--bp-blue-bright);
+  box-shadow: 0 0 0 3px rgba(0, 105, 243, 0.12);
+  outline: none;
+}
+
+.shipment-map-expand {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--bp-surface-sunken);
+  color: var(--bp-blue);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.shipment-map-modal {
+  width: min(1240px, 100%);
+  max-height: calc(100dvh - 40px);
+  padding: 22px 24px;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(0, 14, 63, 0.18);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.shipment-map-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.shipment-map-modal-header h2 {
+  margin: 0 0 2px;
+  font-family: var(--bp-display);
+  color: var(--bp-heading);
+}
+
+.shipment-map-modal-body {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(260px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.shipment-map-modal-body .shipment-map-list-card {
+  margin-top: 12px;
+}
+
+@media (max-width: 860px) {
+  .shipment-map-modal-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
