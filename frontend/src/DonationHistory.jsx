@@ -257,6 +257,13 @@ export default function DonationHistory({ history, error, sideContent = null }) 
   const maxValuation = Math.max(...years.map((entry) => entry.valuation), 1);
   const currentYear = new Date().getFullYear();
   const firstYear = years[0]?.year;
+  // Year-over-year change: the latest year in the data against the one before it.
+  const latestYear = years[years.length - 1];
+  const priorYear = years.find((entry) => entry.year === latestYear?.year - 1);
+  const yearChange =
+    latestYear && priorYear?.valuation > 0
+      ? (latestYear.valuation - priorYear.valuation) / priorYear.valuation
+      : null;
   const active = years.find((entry) => entry.year === activeYear);
 
   // x runs 0-1000 and y 0-100 in the SVG's stretched coordinate space.
@@ -282,9 +289,27 @@ export default function DonationHistory({ history, error, sideContent = null }) 
           >
             Download report
           </button>
-          <p className="donation-total" aria-live="polite">
-            {history ? formatCurrencyWhole(animatedTotal) : "—"}
-          </p>
+          <div className="donation-total-row">
+            <p className="donation-total" aria-live="polite">
+              {history ? formatCurrencyWhole(animatedTotal) : "—"}
+            </p>
+            {yearChange !== null ? (
+              <p
+                className={yearChange >= 0 ? "donation-yoy is-up" : "donation-yoy is-down"}
+                title={`${latestYear.year}${latestYear.year === currentYear ? " so far" : ""}: ${formatCurrencyWhole(latestYear.valuation)} · ${priorYear.year}: ${formatCurrencyWhole(priorYear.valuation)}`}
+              >
+                <span className="donation-yoy-change">
+                  <span aria-hidden="true">{yearChange >= 0 ? "▲" : "▼"}</span>
+                  {" "}
+                  {yearChange >= 0 ? "Up" : "Down"} {Math.round(Math.abs(yearChange) * 100)}%
+                </span>
+                <span className="donation-yoy-detail">
+                  {latestYear.year}
+                  {latestYear.year === currentYear ? " so far" : ""} vs {priorYear.year}
+                </span>
+              </p>
+            ) : null}
+          </div>
           <p className="donation-subtitle">
             Estimated value of the medical supplies Blueprints has shipped
             {firstYear ? ` since ${firstYear}` : ""}.

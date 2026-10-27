@@ -410,6 +410,53 @@ body::before {
   gap: 16px;
 }
 
+/* Year-over-year badge beside the donated total. Arrow and word carry the
+   direction, so it never relies on color alone. */
+.donation-total-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.donation-yoy {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 14px;
+  line-height: 1.2;
+}
+
+.donation-yoy-change {
+  font-family: var(--bp-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.donation-yoy-detail {
+  font-size: 0.74rem;
+  color: var(--bp-ink-muted);
+  white-space: nowrap;
+}
+
+.donation-yoy.is-up {
+  background: #e3f5ec;
+}
+
+.donation-yoy.is-up .donation-yoy-change {
+  color: #0d7a43;
+}
+
+.donation-yoy.is-down {
+  background: #fde8e6;
+}
+
+.donation-yoy.is-down .donation-yoy-change {
+  color: #b42318;
+}
+
 .donation-stats div {
   padding: 10px 14px;
 }
@@ -509,9 +556,12 @@ body::before {
   inset: 0 0 40px 0;
 }
 
+/* 130px bars + 8px gap + 32px label row = the 170px plot, so the bar
+   bottoms land exactly on the baseline 40px up from the bottom. */
 .shipment-bar-chart-compact .shipment-bar-chart-column {
-  grid-template-rows: 130px minmax(1.6em, auto);
+  grid-template-rows: 130px 32px;
   gap: 8px;
+  align-content: start;
 }
 
 .shipment-bar-chart-compact .shipment-bar-chart-bar-wrap {
