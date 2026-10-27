@@ -71,18 +71,72 @@ body::before {
   position: relative;
 }
 
-.donation-report-button {
+.donation-toolbar {
   position: absolute;
-  top: 22px;
+  top: 18px;
   right: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.donation-report-button {
   padding: 6px 14px;
   font-size: 0.78rem;
 }
 
-@media (max-width: 720px) {
-  .donation-report-button {
-    top: 16px;
-    right: 16px;
+/* Year range for Shipment KPIs: From / To dropdowns. */
+.history-year-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-year-filter label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bp-ink-muted);
+}
+
+.history-year-filter select {
+  min-width: 0;
+  padding: 5px 26px 5px 10px;
+  border: 1px solid var(--bp-line-strong);
+  border-radius: 999px;
+  background-color: var(--bp-surface);
+  color: var(--bp-ink);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.history-year-reset {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--bp-surface-sunken);
+  color: var(--bp-blue);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .donation-toolbar {
+    position: static;
+    justify-content: flex-start;
+    margin-bottom: 14px;
   }
 }
 
@@ -282,7 +336,7 @@ body::before {
   /* The report is the donation history; working panels stay off paper. */
   .top-bar,
   .tabs-section,
-  .donation-report-button,
+  .donation-toolbar,
   .page-shell > .panel:not(.donation-history) {
     display: none !important;
   }
@@ -467,8 +521,13 @@ body::before {
 
 .donation-top-split {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr) minmax(0, 0.85fr);
-  gap: 20px;
+  /* Year chart and map on top; chapters, destination type and the
+     country list below, so they all fit on one screen. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-areas:
+    "year map"
+    "chapter type";
+  gap: 0 24px;
   align-items: stretch;
   margin-top: 4px;
 }
@@ -506,7 +565,7 @@ body::before {
 }
 
 .donation-year .donation-plot {
-  height: 210px;
+  height: 170px;
 }
 
 .donation-year .donation-point-value {
@@ -595,20 +654,15 @@ body::before {
   font-size: 0.72rem;
 }
 
-/* Medium screens: year chart across the top, pie and destination type below. */
-@media (max-width: 1300px) {
-  .donation-top-split {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .donation-year {
-    grid-column: 1 / -1;
-  }
-}
+.donation-top-split .donation-year { grid-area: year; }
+.donation-top-split .shipment-map { grid-area: map; }
+.donation-top-split .chapter-breakdown { grid-area: chapter; }
+.donation-top-split .shipment-mix { grid-area: type; }
 
 @media (max-width: 760px) {
   .donation-top-split {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "year" "map" "chapter" "type";
   }
 
   .donation-top-split .chapter-breakdown-body {
@@ -675,4 +729,69 @@ body::before {
 
 .primary-button.danger-button:hover:not(:disabled) {
   background: #a8261f;
+}
+
+/* Destination type: two bars that carry their own count, value and pounds. */
+.type-bars {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  padding: 16px 18px 14px !important;
+}
+
+.type-bar-column {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 10px;
+  min-width: 0;
+}
+
+.type-bar-track {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 150px;
+  border-bottom: 2px solid var(--bp-line-strong);
+}
+
+.type-bar {
+  position: relative;
+  width: min(96px, 70%);
+  border-radius: 10px 10px 0 0;
+  background: #0069f3;
+  transition: height 0.6s ease;
+}
+
+.type-bar-count {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  right: 0;
+  color: #ffffff;
+  font-family: var(--bp-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* A short bar puts its count above instead of inside. */
+.type-bar.is-short .type-bar-count {
+  top: -30px;
+  color: var(--bp-heading);
+}
+
+.type-bar-label {
+  display: grid;
+  gap: 1px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--bp-ink-muted);
+}
+
+.type-bar-label strong {
+  font-family: var(--bp-display);
+  font-size: 0.98rem;
+  color: var(--bp-heading);
 }

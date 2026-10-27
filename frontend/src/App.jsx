@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import DonationHistory, { useDonationHistory } from "./DonationHistory";
 import PastShipmentArchive from "./PastShipmentArchive";
+import ShipmentMap from "./ShipmentMap";
+import { summarizeHistoryShipments, useHistoryShipments } from "./historyStats";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 const SHIPMENT_STORAGE_KEY = "blueprints-current-shipments";
@@ -1427,7 +1429,10 @@ export default function App() {
   const [focusedPastShipmentId, setFocusedPastShipmentId] = useState(null);
   const palletMapRef = useRef(null);
   const inventoryShipmentButtonRef = useRef(null);
-  const { history: donationHistory, error: donationHistoryError } = useDonationHistory();
+  const { history: fullDonationHistory, error: donationHistoryError } = useDonationHistory();
+  const { shipments: historyShipments, error: historyShipmentsError } = useHistoryShipments();
+  // Year range for the Shipment KPIs stats and map; null means no limit.
+  const [historyYearRange, setHistoryYearRange] = useState({ from: null, to: null });
 
   async function refreshDashboard(showLoader = false) {
     try {
@@ -1585,6 +1590,95 @@ export default function App() {
       console.error("Unable to restore pallet layout", err);
     }
   }, []);
+
+  // Shipment KPIs year filter. The full summary comes from /history; a
+  // narrower range is recomputed from the individual past shipments.
+  const historyYears = (fullDonationHistory?.years ?? []).map((entry) => entry.year);
+  const historyFirstYear = historyYears[0] ?? null;
+  const historyLastYear = historyYears[historyYears.length - 1] ?? null;
+  const historyFromYear = historyYearRange.from ?? historyFirstYear;
+  const historyToYear = historyYearRange.to ?? historyLastYear;
+  const isHistoryYearFiltered =
+    historyFromYear !== historyFirstYear || historyToYear !== historyLastYear;
+  function inHistoryYearRange(year) {
+    return (
+      (historyFromYear === null || year >= historyFromYear) &&
+      (historyToYear === null || year <= historyToYear)
+    );
+  }
+  const yearFilteredHistoryShipments = historyShipments?.filter((shipment) =>
+    inHistoryYearRange(shipment.year)
+  );
+  const donationHistory =
+    isHistoryYearFiltered && yearFilteredHistoryShipments
+      ? {
+          ...summarizeHistoryShipments(yearFilteredHistoryShipments),
+          source: fullDonationHistory?.source,
+        }
+      : fullDonationHistory;
+  const historyRangeLabel = !isHistoryYearFiltered
+    ? ""
+    : historyFromYear === historyToYear
+      ? String(historyFromYear)
+      : `${historyFromYear}–${historyToYear}`;
+
+  function setHistoryYear(field, value) {
+    const year = Number(value);
+    setHistoryYearRange((current) => {
+      const next = { from: current.from ?? historyFirstYear, to: current.to ?? historyLastYear, [field]: year };
+      // Keep the range the right way round when one end passes the other.
+      if (next.from > next.to) {
+        if (field === "from") {
+          next.to = year;
+        } else {
+          next.from = year;
+        }
+      }
+      return next;
+    });
+  }
+
+  const historyYearFilter = historyYears.length ? (
+    <div className="history-year-filter">
+      <label>
+        <span>From</span>
+        <select
+          value={historyFromYear}
+          onChange={(event) => setHistoryYear("from", event.target.value)}
+          disabled={!historyShipments}
+        >
+          {historyYears.map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        <span>To</span>
+        <select
+          value={historyToYear}
+          onChange={(event) => setHistoryYear("to", event.target.value)}
+          disabled={!historyShipments}
+        >
+          {historyYears.map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
+      </label>
+      {isHistoryYearFiltered ? (
+        <button
+          type="button"
+          className="history-year-reset"
+          onClick={() => setHistoryYearRange({ from: null, to: null })}
+        >
+          All years
+        </button>
+      ) : null}
+    </div>
+  ) : null;
 
   const currentShipments = shipments.filter((shipment) => !shipment.isCompleted);
   const pastShipments = shipments.filter((shipment) => shipment.isCompleted);
@@ -3201,10 +3295,14 @@ export default function App() {
     },
   ];
   // Past shipments from the Master Shipment Database, by type, plus the ones
-  // tracked in this app.
+  // tracked in this app (counted when created within the chosen years).
   const shipmentsByType = shipmentTypeOptions.map((type) => {
     const past = donationHistory?.types?.find((entry) => entry.type === type);
-    const appCount = shipments.filter((shipment) => normalizeShipmentType(shipment.shipmentType) === type).length;
+    const appCount = shipments.filter(
+      (shipment) =>
+        normalizeShipmentType(shipment.shipmentType) === type &&
+        inHistoryYearRange(Number(String(shipment.createdAt || todayIsoDate()).slice(0, 4)))
+    ).length;
     return {
       type,
       count: appCount + (past?.shipments ?? 0),
@@ -3284,43 +3382,41 @@ export default function App() {
   );
 
   // Shipment Mix sits beside the chapter breakdown in the donation section.
+  // Each bar carries its own count, value and poundage, so no separate cards.
+  const maxTypeCount = Math.max(...shipmentsByType.map((entry) => entry.count), 1);
   const shipmentMix = (
     <div className="shipment-mix">
       <div className="donation-chart-header">
         <h3>Shipments by destination type</h3>
       </div>
-      <div className="shipment-mix-body">
-        <ShipmentBarChart
-          compact
-          data={shipmentsByType.map((entry) => ({
-            label: entry.type,
-            count: entry.count,
-          }))}
-        />
+      <div className="shipment-mix-body type-bars">
+        {shipmentsByType.map((entry) => (
+          <div className="type-bar-column" key={entry.type}>
+            <div className="type-bar-track">
+              <div
+                className={entry.count / maxTypeCount < 0.25 ? "type-bar is-short" : "type-bar"}
+                style={{ height: `${Math.max((entry.count / maxTypeCount) * 100, 4)}%` }}
+              >
+                <span className="type-bar-count">{formatNumber(entry.count)}</span>
+              </div>
+            </div>
+            <div className="type-bar-label">
+              <strong>{entry.type}</strong>
+              <span>{formatNumber(entry.count)} shipments</span>
+              {donationHistory?.types?.length ? (
+                <span title={`${formatWholeCurrency(entry.valuation)} · ${formatNumber(Math.round(entry.pounds))} lbs`}>
+                  {formatCompactNumber(entry.valuation, "$")} · {formatCompactNumber(entry.pounds)} lbs
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ))}
       </div>
       {donationHistory?.types?.length ? (
-        <>
-          <dl className="shipment-type-stats">
-            {shipmentsByType.map((entry) => (
-              <div key={entry.type}>
-                <dt>{entry.type}</dt>
-                <dd>
-                  <strong>{formatNumber(entry.count)}</strong> shipments
-                </dd>
-                <dd title={formatWholeCurrency(entry.valuation)}>
-                  {formatCompactNumber(entry.valuation, "$")} donated
-                </dd>
-                <dd title={`${formatNumber(Math.round(entry.pounds))} lbs`}>
-                  {formatCompactNumber(entry.pounds)} lbs
-                </dd>
-              </div>
-            ))}
-          </dl>
-          <p className="shipment-type-note">
-            Includes past shipments from the Master Shipment Database. National shipments count as
-            International.
-          </p>
-        </>
+        <p className="shipment-type-note">
+          Includes past shipments from the Master Shipment Database. National shipments count as
+          International.
+        </p>
       ) : null}
     </div>
   );
@@ -4890,7 +4986,21 @@ export default function App() {
 
       {!loading && !error && activeTab === "shipment-kpis" ? (
         <>
-        <DonationHistory history={donationHistory} error={donationHistoryError} sideContent={shipmentMix} />
+        <DonationHistory
+          history={donationHistory}
+          allYears={fullDonationHistory?.years}
+          error={donationHistoryError}
+          sideContent={shipmentMix}
+          yearFilter={historyYearFilter}
+          rangeLabel={historyRangeLabel}
+          mapContent={
+            <ShipmentMap
+              shipments={yearFilteredHistoryShipments}
+              error={historyShipmentsError}
+              rangeLabel={historyRangeLabel}
+            />
+          }
+        />
         <section className="panel">
           <div className="panel-header">
             <div>
