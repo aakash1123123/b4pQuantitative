@@ -961,6 +961,11 @@ function MetricCard({ label, value, className = "", valueClassName = "" }) {
   );
 }
 
+// One-line legend detail for the three inventory pies that sit side by side.
+function pieLegendDetail(segment) {
+  return `${formatNumber(segment.value)} · ${segment.percentage}%`;
+}
+
 function PieChartCard({
   title,
   ariaLabel,
@@ -3957,10 +3962,10 @@ export default function App() {
           </div>
 
           <div className="kpi-analytics-grid">
-            <div className="summary-card kpi-card-full">
+            <div className="summary-card kpi-card-third kpi-pie-card">
               <div className="panel-header">
                 <div>
-                  <h3>Inventory at a glance by expiration window</h3>
+                  <h3>By expiration window</h3>
                 </div>
               </div>
 
@@ -3972,6 +3977,7 @@ export default function App() {
                   legendSegments={expirationChartData}
                   background={expirationPieBackground}
                   activeLabel={activeExpirationPieLabel}
+                  renderLegendDetail={pieLegendDetail}
                   onHover={setActiveExpirationPieLabel}
                   onSegmentClick={(segment) =>
                     openChartSegmentInInventory("expiration", segment.label)
@@ -3982,10 +3988,10 @@ export default function App() {
               )}
             </div>
 
-            <div className="summary-card kpi-card-full">
+            <div className="summary-card kpi-card-third kpi-pie-card">
               <div className="panel-header">
                 <div>
-                  <h3>Inventory at a glance by supply category</h3>
+                  <h3>By supply category</h3>
                 </div>
                 <span className="pill">{formatNumber(uniqueCategories)} categories</span>
               </div>
@@ -3998,6 +4004,7 @@ export default function App() {
                   legendSegments={categoryChartLegendData}
                   background={categoryPieBackground}
                   activeLabel={activeCategoryPieLabel}
+                  renderLegendDetail={pieLegendDetail}
                   onHover={setActiveCategoryPieLabel}
                   cardClassName="category-pie-card"
                   onSegmentClick={(segment) =>
@@ -4009,10 +4016,10 @@ export default function App() {
               )}
             </div>
 
-            <div className="summary-card kpi-card-full">
+            <div className="summary-card kpi-card-third kpi-pie-card">
               <div className="panel-header">
                 <div>
-                  <h3>Inventory by unit price bucket</h3>
+                  <h3>By unit price</h3>
                 </div>
               </div>
 
@@ -4024,6 +4031,7 @@ export default function App() {
                   legendSegments={valueBucketLegendData}
                   background={valueBucketPieBackground}
                   activeLabel={activeValuePieLabel}
+                  renderLegendDetail={pieLegendDetail}
                   onHover={setActiveValuePieLabel}
                   cardClassName="kpi-compact-card"
                   onSegmentClick={(segment) =>
