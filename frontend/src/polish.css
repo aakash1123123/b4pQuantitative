@@ -795,3 +795,83 @@ body::before {
   font-size: 0.98rem;
   color: var(--bp-heading);
 }
+
+/* Inventory KPIs: the three pies side by side, each with the donut on top
+   and a one-line legend underneath. */
+.kpi-pie-card .expiry-chart-card {
+  min-height: 0;
+  padding: 16px 14px;
+}
+
+.kpi-pie-card .expiration-pie-layout,
+.kpi-pie-card.summary-card .expiration-pie-layout {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.kpi-pie-card .expiration-pie-wrap {
+  justify-content: center;
+}
+
+.kpi-pie-card .expiration-pie-chart {
+  width: 168px;
+}
+
+.kpi-pie-card .expiration-pie-chart::after {
+  inset: 24px;
+}
+
+.kpi-pie-card .expiration-pie-center strong {
+  font-size: 1.25rem;
+}
+
+.kpi-pie-card .expiration-pie-legend {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  max-height: 244px;
+  overflow-y: auto;
+}
+
+.kpi-pie-card .expiration-pie-legend-row {
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 8px;
+}
+
+.kpi-pie-card .expiration-pie-copy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.kpi-pie-card .expiration-pie-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.86rem;
+}
+
+.kpi-pie-card .expiration-pie-copy span {
+  font-size: 0.76rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-pie-card .expiration-pie-click-hint {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .kpi-analytics-grid > .kpi-pie-card {
+    grid-column: 1 / -1;
+  }
+
+  .kpi-pie-card .expiration-pie-legend {
+    max-height: none;
+  }
+}
